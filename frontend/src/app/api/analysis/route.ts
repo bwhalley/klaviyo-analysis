@@ -152,11 +152,12 @@ async function runAnalysisBackground(analysisId: string, apiKey: string) {
   try {
     const startTime = Date.now()
 
-    // Update status to running
-    await prisma.analysis.update({
-      where: { id: analysisId },
-      data: { status: 'running', startedAt: new Date() },
-    })
+    // Update status to running - use raw SQL to avoid minifier issues
+    await prisma.$executeRaw`
+      UPDATE analyses 
+      SET status = 'running', started_at = NOW()
+      WHERE id = ${analysisId}::uuid
+    `
 
     // Initialize Klaviyo service
     const klaviyoService = new KlaviyoService(apiKey)
@@ -177,18 +178,16 @@ async function runAnalysisBackground(analysisId: string, apiKey: string) {
 
     const executionTime = Date.now() - startTime
 
-    // Save results
-    await prisma.analysis.update({
-      where: { id: analysisId },
-      data: {
-        status: 'completed',
-        results: results as any,
-        executionTimeMs: executionTime,
-        eventsProcessed:
-          subscriptionEvents.length + orderEvents.length,
-        completedAt: new Date(),
-      },
-    })
+    // Save results - use raw SQL to avoid minifier issues
+    await prisma.$executeRaw`
+      UPDATE analyses 
+      SET status = 'completed',
+          results = ${JSON.stringify(results)}::jsonb,
+          execution_time_ms = ${executionTime},
+          events_processed = ${subscriptionEvents.length + orderEvents.length},
+          completed_at = NOW()
+      WHERE id = ${analysisId}::uuid
+    `
 
     // Optionally save profile data
     // This is commented out to avoid overwhelming the database
@@ -209,16 +208,16 @@ async function runAnalysisBackground(analysisId: string, apiKey: string) {
     console.log(`[Analysis ${analysisId}] ✅ Completed in ${executionTime}ms`)
   } catch (error: any) {
     console.error(`[Analysis ${analysisId}] ❌ Failed:`, error)
-
-    await prisma.analysis.update({
-      where: { id: analysisId },
-      data: {
-        status: 'failed',
-        errorMessage: error.message,
-        errorStack: error.stack,
-        completedAt: new Date(),
-      },
-    })
+    
+    // Update failure status - use raw SQL to avoid minifier issues
+    await prisma.$executeRaw`
+      UPDATE analyses 
+      SET status = 'failed',
+          error_message = ${error.message || 'Unknown error'},
+          error_stack = ${error.stack || ''},
+          completed_at = NOW()
+      WHERE id = ${analysisId}::uuid
+    `
   }
 }
 

@@ -45,11 +45,12 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid email or password')
         }
 
-        // Update last login
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastLoginAt: new Date() },
-        })
+        // Update last login - use raw SQL to avoid minifier issues
+        await prisma.$executeRaw`
+          UPDATE users 
+          SET last_login_at = NOW()
+          WHERE id = ${user.id}::uuid
+        `
 
         return {
           id: user.id,

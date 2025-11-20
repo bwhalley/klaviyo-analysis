@@ -52,8 +52,8 @@ WORKDIR /app
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Install OpenSSL and other required libraries for Prisma
-RUN apk add --no-cache libc6-compat openssl
+# Install OpenSSL, CA certificates, and other required libraries for Prisma
+RUN apk add --no-cache libc6-compat openssl ca-certificates
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodejs
