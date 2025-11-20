@@ -1,0 +1,111 @@
+// Prisma Schema for Klaviyo Analysis Web App
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     String              @id @default(uuid())
+  email                  String              @unique
+  passwordHash           String              @map("password_hash")
+  name                   String?
+  klaviyoApiKeyEncrypted String?             @map("klaviyo_api_key_encrypted")
+  klaviyoAccountId       String?             @map("klaviyo_account_id")
+  timezone               String              @default("UTC")
+  defaultCohortPeriod    String              @default("week") @map("default_cohort_period")
+  emailVerified          Boolean             @default(false) @map("email_verified")
+  isActive               Boolean             @default(true) @map("is_active")
+  role                   String              @default("user")
+  createdAt              DateTime            @default(now()) @map("created_at")
+  updatedAt              DateTime            @updatedAt @map("updated_at")
+  lastLoginAt            DateTime?           @map("last_login_at")
+  analyses               Analysis[]
+  apiKeys                ApiKey[]
+  scheduledAnalyses      ScheduledAnalysis[]
+
+  @@map("users")
+}
+
+model Analysis {
+  id              String            @id @default(uuid())
+  userId          String            @map("user_id")
+  name            String
+  description     String?
+  status          String            @default("pending") // pending, running, completed, failed
+  params          Json              @default("{}")
+  results         Json?
+  errorMessage    String?           @map("error_message")
+  errorStack      String?           @map("error_stack")
+  executionTimeMs Int?              @map("execution_time_ms")
+  eventsProcessed Int?              @map("events_processed")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  startedAt       DateTime?         @map("started_at")
+  completedAt     DateTime?         @map("completed_at")
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profiles        AnalysisProfile[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("analyses")
+}
+
+model AnalysisProfile {
+  id               String    @id @default(uuid())
+  analysisId       String    @map("analysis_id")
+  profileId        String    @map("profile_id")
+  email            String?
+  subscriptionDate DateTime  @map("subscription_date")
+  firstOrderDate   DateTime? @map("first_order_date")
+  daysToFirstOrder Int?      @map("days_to_first_order")
+  metadata         Json      @default("{}")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  analysis         Analysis  @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([profileId])
+  @@map("analysis_profiles")
+}
+
+model ApiKey {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  name         String
+  keyEncrypted String    @map("key_encrypted")
+  keyPrefix    String?   @map("key_prefix")
+  scopes       String[]
+  lastUsedAt   DateTime? @map("last_used_at")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  expiresAt    DateTime? @map("expires_at")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_keys")
+}
+
+model ScheduledAnalysis {
+  id                 String    @id @default(uuid())
+  userId             String    @map("user_id")
+  name               String
+  cronExpression     String    @map("cron_expression")
+  params             Json      @default("{}")
+  notifyOnCompletion Boolean   @default(true) @map("notify_on_completion")
+  notificationEmail  String?   @map("notification_email")
+  isActive           Boolean   @default(true) @map("is_active")
+  lastRunAt          DateTime? @map("last_run_at")
+  nextRunAt          DateTime? @map("next_run_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([nextRunAt])
+  @@map("scheduled_analyses")
+}
+
