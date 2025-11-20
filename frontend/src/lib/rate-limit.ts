@@ -3,8 +3,7 @@
  * Implements in-memory and Redis-based rate limiting
  */
 
-import { Redis } from 'ioredis'
-import { redis } from './redis'
+import redis from './redis'
 import { getConfig } from './env'
 
 export type RateLimitResult = {

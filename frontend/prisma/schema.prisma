@@ -24,6 +24,24 @@ model User {
   createdAt              DateTime            @default(now()) @map("created_at")
   updatedAt              DateTime            @updatedAt @map("updated_at")
   lastLoginAt            DateTime?           @map("last_login_at")
+  
+  // Security fields (Phase 1)
+  failedLoginAttempts    Int                 @default(0) @map("failed_login_attempts")
+  lockedUntil            DateTime?           @map("locked_until")
+  lastFailedLoginAt      DateTime?           @map("last_failed_login_at")
+  
+  // Data retention preferences (Phase 2)
+  retentionFailedAnalysesDays     Int       @default(7) @map("retention_failed_analyses_days")
+  retentionCompletedAnalysesDays  Int       @default(90) @map("retention_completed_analyses_days")
+  retentionAutoArchiveDays        Int       @default(30) @map("retention_auto_archive_days")
+  
+  // OAuth tokens (Phase 2)
+  klaviyoOauthAccessToken     String?   @map("klaviyo_oauth_access_token")
+  klaviyoOauthRefreshToken    String?   @map("klaviyo_oauth_refresh_token")
+  klaviyoOauthTokenExpiresAt  DateTime? @map("klaviyo_oauth_token_expires_at")
+  klaviyoOauthScopes          String[]  @map("klaviyo_oauth_scopes")
+  klaviyoOauthConnectedAt     DateTime? @map("klaviyo_oauth_connected_at")
+  
   analyses               Analysis[]
   apiKeys                ApiKey[]
   scheduledAnalyses      ScheduledAnalysis[]
@@ -32,26 +50,32 @@ model User {
 }
 
 model Analysis {
-  id              String            @id @default(uuid())
-  userId          String            @map("user_id")
-  name            String
-  description     String?
-  status          String            @default("pending") // pending, running, completed, failed
-  params          Json              @default("{}")
-  results         Json?
-  errorMessage    String?           @map("error_message")
-  errorStack      String?           @map("error_stack")
-  executionTimeMs Int?              @map("execution_time_ms")
-  eventsProcessed Int?              @map("events_processed")
-  createdAt       DateTime          @default(now()) @map("created_at")
-  startedAt       DateTime?         @map("started_at")
-  completedAt     DateTime?         @map("completed_at")
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  profiles        AnalysisProfile[]
+  id                    String            @id @default(uuid())
+  userId                String            @map("user_id")
+  name                  String
+  description           String?
+  status                String            @default("pending") // pending, running, completed, failed
+  params                Json              @default("{}")
+  results               Json?
+  errorMessage          String?           @map("error_message")
+  errorStack            String?           @map("error_stack")
+  executionTimeMs       Int?              @map("execution_time_ms")
+  eventsProcessed       Int?              @map("events_processed")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  startedAt             DateTime?         @map("started_at")
+  completedAt           DateTime?         @map("completed_at")
+  
+  // Retention fields (Phase 2)
+  retentionOverrideDays Int?              @map("retention_override_days")
+  archivedAt            DateTime?         @map("archived_at")
+  
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profiles              AnalysisProfile[]
 
   @@index([userId])
   @@index([status])
   @@index([createdAt(sort: Desc)])
+  @@index([archivedAt])
   @@map("analyses")
 }
 
