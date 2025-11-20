@@ -30,11 +30,12 @@ COPY frontend/ ./
 ENV NEXT_TELEMETRY_DISABLED 1
 ENV NODE_ENV production
 # Dummy values for build time (will be overridden at runtime)
+# These are intentionally fake and will never be used in production
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV REDIS_URL="redis://localhost:6379"
 ENV NEXTAUTH_URL="http://localhost:3000"
-ENV NEXTAUTH_SECRET="dummy-secret-for-build-only-must-be-32-characters-long"
-ENV ENCRYPTION_KEY="dummy-encryption-key-32-chars!"
+ENV NEXTAUTH_SECRET="build-only-secret-12345678901234567890123456789012"
+ENV ENCRYPTION_KEY="build-only-encrypt-12345678901234567890123456789012"
 
 # Generate Prisma Client for the target platform
 RUN npx prisma generate

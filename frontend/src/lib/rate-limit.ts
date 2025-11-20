@@ -142,18 +142,42 @@ export class RateLimiter {
   }
 }
 
-// Pre-configured rate limiters
-const config = getConfig()
+// Pre-configured rate limiters (lazy-loaded to avoid calling getConfig during build)
+let _loginRateLimiter: RateLimiter | null = null
+let _apiRateLimiter: RateLimiter | null = null
 
-export const loginRateLimiter = new RateLimiter(
-  config.LOGIN_RATE_LIMIT_WINDOW_MS,
-  config.LOGIN_RATE_LIMIT_MAX_ATTEMPTS
-)
+export function getLoginRateLimiter(): RateLimiter {
+  if (!_loginRateLimiter) {
+    const config = getConfig()
+    _loginRateLimiter = new RateLimiter(
+      config.LOGIN_RATE_LIMIT_WINDOW_MS,
+      config.LOGIN_RATE_LIMIT_MAX_ATTEMPTS
+    )
+  }
+  return _loginRateLimiter
+}
 
-export const apiRateLimiter = new RateLimiter(
-  config.RATE_LIMIT_WINDOW_MS,
-  config.RATE_LIMIT_MAX_REQUESTS
-)
+export function getApiRateLimiter(): RateLimiter {
+  if (!_apiRateLimiter) {
+    const config = getConfig()
+    _apiRateLimiter = new RateLimiter(
+      config.RATE_LIMIT_WINDOW_MS,
+      config.RATE_LIMIT_MAX_REQUESTS
+    )
+  }
+  return _apiRateLimiter
+}
+
+// Backwards compatibility exports (deprecated - use getter functions instead)
+export const loginRateLimiter = {
+  check: (identifier: string) => getLoginRateLimiter().check(identifier),
+  reset: (identifier: string) => getLoginRateLimiter().reset(identifier),
+}
+
+export const apiRateLimiter = {
+  check: (identifier: string) => getApiRateLimiter().check(identifier),
+  reset: (identifier: string) => getApiRateLimiter().reset(identifier),
+}
 
 /**
  * Helper to create rate limit response headers
