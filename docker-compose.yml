@@ -8,13 +8,22 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://klaviyo_user:klaviyo_pass@db:5432/klaviyo_analysis
-      - REDIS_URL=redis://redis:6379
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=development-secret-change-in-production-must-be-32-chars-long!
-      - ENCRYPTION_KEY=development-encryption-key-32!
+      # These can be overridden by .env file
+      - NODE_ENV=${NODE_ENV:-production}
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-900000}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
+      - LOGIN_RATE_LIMIT_WINDOW_MS=${LOGIN_RATE_LIMIT_WINDOW_MS:-900000}
+      - LOGIN_RATE_LIMIT_MAX_ATTEMPTS=${LOGIN_RATE_LIMIT_MAX_ATTEMPTS:-5}
+      - MAX_FAILED_LOGIN_ATTEMPTS=${MAX_FAILED_LOGIN_ATTEMPTS:-5}
+      - ACCOUNT_LOCKOUT_DURATION_MINUTES=${ACCOUNT_LOCKOUT_DURATION_MINUTES:-30}
     depends_on:
       - db
       - redis
@@ -24,10 +33,12 @@ services:
   # PostgreSQL database
   db:
     image: postgres:16-alpine
+    env_file:
+      - .env
     environment:
-      - POSTGRES_USER=klaviyo_user
-      - POSTGRES_PASSWORD=klaviyo_pass
-      - POSTGRES_DB=klaviyo_analysis
+      - POSTGRES_USER=${POSTGRES_USER:-klaviyo_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-klaviyo_analysis}
     ports:
       - "5432:5432"
     volumes:
@@ -36,7 +47,7 @@ services:
     networks:
       - klaviyo-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U klaviyo_user"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-klaviyo_user}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -59,9 +70,11 @@ services:
   # pgAdmin for database management (optional, remove in production)
   pgadmin:
     image: dpage/pgadmin4
+    env_file:
+      - .env
     environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@klaviyo-analysis.local
-      - PGADMIN_DEFAULT_PASSWORD=admin
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL:-admin@klaviyo-analysis.local}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
       - PGADMIN_CONFIG_SERVER_MODE=False
     ports:
       - "5050:80"
