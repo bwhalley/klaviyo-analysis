@@ -85,13 +85,16 @@ export function validateEnv(): EnvConfig {
     }
     
     // Validate NEXTAUTH_SECRET length (should be at least 32 characters)
-    if (process.env.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET.length < 32) {
-      errors.push('NEXTAUTH_SECRET must be at least 32 characters long')
+    const nextAuthSecret = process.env.NEXTAUTH_SECRET?.trim()
+    if (nextAuthSecret && nextAuthSecret.length < 32) {
+      errors.push(`NEXTAUTH_SECRET must be at least 32 characters long (current: ${nextAuthSecret.length})`)
     }
     
-    // Validate ENCRYPTION_KEY length
-    if (process.env.ENCRYPTION_KEY && process.env.ENCRYPTION_KEY.length < 32) {
-      errors.push('ENCRYPTION_KEY must be at least 32 characters long')
+    // Validate ENCRYPTION_KEY length (should be at least 32 characters)
+    const encryptionKey = process.env.ENCRYPTION_KEY?.trim()
+    if (encryptionKey && encryptionKey.length < 32) {
+      errors.push(`ENCRYPTION_KEY must be at least 32 characters long (current: ${encryptionKey.length} characters)`)
+      errors.push(`  Tip: Run "openssl rand -hex 32" to generate a 64-character key`)
     }
     
     // Validate DATABASE_URL format
@@ -139,9 +142,19 @@ export function getConfig(): EnvConfig {
   return config
 }
 
-// Validate on module load in production
-if (process.env.NODE_ENV === 'production') {
-  validateEnv()
-  console.log('✅ Environment variables validated successfully')
+// Validate on module load in production (but NOT during build phase)
+// During Docker build, the .env file isn't available yet (mounted at runtime)
+const isNextBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
+const isBuildTime = process.argv.includes('build') || isNextBuildPhase
+
+if (process.env.NODE_ENV === 'production' && !isBuildTime) {
+  try {
+    validateEnv()
+    console.log('✅ Environment variables validated successfully')
+  } catch (error) {
+    console.error('❌ Environment validation failed:', error)
+    // In production, fail fast if env validation fails at runtime
+    throw error
+  }
 }
 
