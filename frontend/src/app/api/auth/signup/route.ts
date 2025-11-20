@@ -4,27 +4,10 @@ import { hashPassword } from '@/lib/encryption'
 import { auditLog } from '@/lib/audit'
 import { z } from 'zod'
 
-// Enhanced password validation
+// Simple password validation - minimum 8 characters
 const passwordSchema = z
   .string()
-  .min(12, 'Password must be at least 12 characters long')
-  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-  .regex(/[0-9]/, 'Password must contain at least one number')
-  .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character')
-  .refine(
-    (password) => {
-      // Check against common passwords
-      const commonPasswords = [
-        'password123', 'Password123!', 'admin123', 'welcome123',
-        'qwerty123', 'letmein123', 'abc123456', '123456789',
-      ]
-      return !commonPasswords.some(common => 
-        password.toLowerCase().includes(common.toLowerCase())
-      )
-    },
-    'Password is too common or weak'
-  )
+  .min(8, 'Password must be at least 8 characters long')
 
 const signupSchema = z.object({
   email: z.string().email(),
