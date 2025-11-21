@@ -24,6 +24,8 @@ export default function NewAnalysisPage() {
     cohortPeriod: 'week' as 'day' | 'week' | 'month',
     startMetricId: '',
     conversionMetricId: '',
+    startMetricFilter: '',
+    conversionMetricFilter: '',
     dateRangePreset: 'all' as 'all' | 'last30' | 'last90' | 'last180' | 'thisYear' | 'lastYear' | 'custom',
     startDate: '',
     endDate: '',
@@ -185,6 +187,21 @@ export default function NewAnalysisPage() {
                   <p className="mt-1 text-sm text-gray-500">
                     The metric that starts the cohort (e.g., &quot;Subscribed to List&quot;)
                   </p>
+                  
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Start Metric Filter (Optional)
+                    </label>
+                    <Input
+                      name="startMetricFilter"
+                      value={formData.startMetricFilter}
+                      onChange={handleChange}
+                      placeholder='e.g., equals($attributed_message,"abc123")'
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Klaviyo API filter syntax. Example: <code className="bg-gray-100 px-1 rounded">equals($attributed_message,&quot;abc123&quot;)</code>
+                    </p>
+                  </div>
                 </div>
 
                 <div>
@@ -209,6 +226,21 @@ export default function NewAnalysisPage() {
                   <p className="mt-1 text-sm text-gray-500">
                     The metric to track conversions for (e.g., &quot;Placed Order&quot;)
                   </p>
+                  
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Conversion Metric Filter (Optional)
+                    </label>
+                    <Input
+                      name="conversionMetricFilter"
+                      value={formData.conversionMetricFilter}
+                      onChange={handleChange}
+                      placeholder='e.g., greater-than($value,50)'
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Klaviyo API filter syntax. Example: <code className="bg-gray-100 px-1 rounded">greater-than($value,50)</code>
+                    </p>
+                  </div>
                 </div>
               </>
             )}
