@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/encryption'
+import { auditLog } from '@/lib/audit'
 import { z } from 'zod'
+
+// Simple password validation - minimum 8 characters
+const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters long')
 
 const signupSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
   name: z.string().optional(),
 })
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now()
+  
   try {
     const body = await request.json()
     const validatedData = signupSchema.parse(body)
@@ -20,6 +28,14 @@ export async function POST(request: NextRequest) {
     })
 
     if (existingUser) {
+      await auditLog({
+        action: 'auth.signup',
+        result: 'failure',
+        errorMessage: 'Email already exists',
+        metadata: { email: validatedData.email },
+        durationMs: Date.now() - startTime,
+      })
+      
       return NextResponse.json(
         { error: 'User with this email already exists' },
         { status: 400 }
@@ -44,6 +60,14 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    await auditLog({
+      userId: user.id,
+      action: 'auth.signup',
+      result: 'success',
+      metadata: { email: validatedData.email },
+      durationMs: Date.now() - startTime,
+    })
+
     return NextResponse.json(
       {
         success: true,
@@ -56,11 +80,26 @@ export async function POST(request: NextRequest) {
     console.error('Signup error:', error)
 
     if (error instanceof z.ZodError) {
+      await auditLog({
+        action: 'auth.signup',
+        result: 'failure',
+        errorMessage: 'Validation failed',
+        metadata: { errors: error.errors },
+        durationMs: Date.now() - startTime,
+      })
+      
       return NextResponse.json(
         { error: 'Invalid input', details: error.errors },
         { status: 400 }
       )
     }
+
+    await auditLog({
+      action: 'auth.signup',
+      result: 'error',
+      errorMessage: error.message,
+      durationMs: Date.now() - startTime,
+    })
 
     return NextResponse.json(
       { error: 'Failed to create account' },

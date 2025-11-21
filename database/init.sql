@@ -271,10 +271,12 @@ CREATE TRIGGER update_users_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- Trigger for analyses table
-CREATE TRIGGER update_analyses_updated_at
-    BEFORE UPDATE ON analyses
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+-- NOTE: Disabled because analyses table doesn't have updated_at column
+-- If you add updated_at to analyses, uncomment this trigger:
+-- CREATE TRIGGER update_analyses_updated_at
+--     BEFORE UPDATE ON analyses
+--     FOR EACH ROW
+--     EXECUTE FUNCTION update_updated_at_column();
 
 -- Trigger for scheduled_analyses table
 CREATE TRIGGER update_scheduled_analyses_updated_at
