@@ -6,6 +6,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    # Use public DNS servers to avoid DNS resolution issues
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     env_file:
       - .env
     environment:
