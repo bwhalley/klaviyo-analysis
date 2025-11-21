@@ -136,15 +136,30 @@ export class AnalysisService {
   /**
    * Generate cohort data
    */
-  generateCohortData(profiles: ProfileData[]): CohortDataPoint[] {
-    // Group by week of subscription
+  generateCohortData(
+    profiles: ProfileData[],
+    period: 'day' | 'week' | 'month' = 'week'
+  ): CohortDataPoint[] {
+    // Group by period of subscription
     const cohorts = new Map<string, ProfileData[]>()
 
     for (const profile of profiles) {
       const date = profile.firstSubscriptionDate
       const year = date.getFullYear()
-      const week = this.getWeekNumber(date)
-      const cohortKey = `${year}-W${week.toString().padStart(2, '0')}`
+      let cohortKey: string
+
+      if (period === 'day') {
+        const month = (date.getMonth() + 1).toString().padStart(2, '0')
+        const day = date.getDate().toString().padStart(2, '0')
+        cohortKey = `${year}-${month}-${day}`
+      } else if (period === 'month') {
+        const month = (date.getMonth() + 1).toString().padStart(2, '0')
+        cohortKey = `${year}-${month}`
+      } else {
+        // week (default)
+        const week = this.getWeekNumber(date)
+        cohortKey = `${year}-W${week.toString().padStart(2, '0')}`
+      }
 
       if (!cohorts.has(cohortKey)) {
         cohorts.set(cohortKey, [])
@@ -212,29 +227,30 @@ export class AnalysisService {
    * Main analysis function
    */
   async runAnalysis(
-    subscriptionEvents: any[],
-    orderEvents: any[]
+    startEvents: any[],
+    conversionEvents: any[],
+    cohortPeriod: 'day' | 'week' | 'month' = 'week'
   ): Promise<{
     statistics: Statistics
     cohortData: CohortDataPoint[]
     profiles: ProfileData[]
   }> {
-    console.log(`Processing ${subscriptionEvents.length} subscription events...`)
-    const subscriptions = this.processSubscriptionEvents(subscriptionEvents)
-    console.log(`Found ${subscriptions.size} unique subscribers`)
+    console.log(`Processing ${startEvents.length} start events...`)
+    const subscriptions = this.processSubscriptionEvents(startEvents)
+    console.log(`Found ${subscriptions.size} unique profiles`)
 
-    console.log(`Processing ${orderEvents.length} order events...`)
-    const orders = this.processOrderEvents(orderEvents)
-    console.log(`Found ${orders.size} unique profiles with orders`)
+    console.log(`Processing ${conversionEvents.length} conversion events...`)
+    const orders = this.processOrderEvents(conversionEvents)
+    console.log(`Found ${orders.size} unique profiles with conversions`)
 
-    console.log('Matching subscriptions to orders...')
+    console.log('Matching start events to conversions...')
     const profiles = this.matchSubscriptionsToOrders(subscriptions, orders)
 
     console.log('Calculating statistics...')
     const statistics = this.calculateStatistics(profiles)
 
-    console.log('Generating cohort data...')
-    const cohortData = this.generateCohortData(profiles)
+    console.log(`Generating cohort data (grouped by ${cohortPeriod})...`)
+    const cohortData = this.generateCohortData(profiles, cohortPeriod)
 
     return {
       statistics,

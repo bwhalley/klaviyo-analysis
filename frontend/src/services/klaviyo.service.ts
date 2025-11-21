@@ -163,14 +163,23 @@ export class KlaviyoService {
   }
 
   /**
-   * Get subscription events
+   * Get all events for any metric (alias for getAllEventsWithPagination)
+   */
+  async getAllEvents(metricId: string): Promise<KlaviyoEvent[]> {
+    return this.getAllEventsWithPagination(metricId)
+  }
+
+  /**
+   * Get subscription events (legacy - use getAllEvents with metric ID instead)
+   * @deprecated
    */
   async getSubscriptionEvents(): Promise<KlaviyoEvent[]> {
     return this.getAllEventsWithPagination(METRIC_IDS.SUBSCRIBED_TO_LIST)
   }
 
   /**
-   * Get order events
+   * Get order events (legacy - use getAllEvents with metric ID instead)
+   * @deprecated
    */
   async getOrderEvents(): Promise<KlaviyoEvent[]> {
     return this.getAllEventsWithPagination(METRIC_IDS.PLACED_ORDER)
