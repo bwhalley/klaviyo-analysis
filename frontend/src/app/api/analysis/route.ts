@@ -10,6 +10,8 @@ import { z } from 'zod'
 const analysisSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
+  startMetricId: z.string().min(1, 'Start metric is required'),
+  conversionMetricId: z.string().min(1, 'Conversion metric is required'),
   dateRange: z
     .object({
       start: z.string(),
@@ -64,7 +66,13 @@ export async function POST(request: NextRequest) {
     })
 
     // Run analysis in background (simplified version - in production use a job queue)
-    runAnalysisBackground(analysis.id, apiKey)
+    runAnalysisBackground(
+      analysis.id,
+      apiKey,
+      validatedData.startMetricId,
+      validatedData.conversionMetricId,
+      validatedData.cohortPeriod || 'week'
+    )
 
     return NextResponse.json({
       success: true,
@@ -148,7 +156,13 @@ export async function GET(request: NextRequest) {
  * Background analysis runner
  * In production, this should be moved to a job queue (Bull, BullMQ, etc.)
  */
-async function runAnalysisBackground(analysisId: string, apiKey: string) {
+async function runAnalysisBackground(
+  analysisId: string,
+  apiKey: string,
+  startMetricId: string,
+  conversionMetricId: string,
+  cohortPeriod: 'day' | 'week' | 'month'
+) {
   try {
     const startTime = Date.now()
 
@@ -162,18 +176,19 @@ async function runAnalysisBackground(analysisId: string, apiKey: string) {
     // Initialize Klaviyo service
     const klaviyoService = new KlaviyoService(apiKey)
 
-    // Fetch events
-    console.log(`[Analysis ${analysisId}] Fetching subscription events...`)
-    const subscriptionEvents = await klaviyoService.getSubscriptionEvents()
+    // Fetch events for the selected metrics
+    console.log(`[Analysis ${analysisId}] Fetching start metric events (${startMetricId})...`)
+    const startEvents = await klaviyoService.getAllEvents(startMetricId)
 
-    console.log(`[Analysis ${analysisId}] Fetching order events...`)
-    const orderEvents = await klaviyoService.getOrderEvents()
+    console.log(`[Analysis ${analysisId}] Fetching conversion metric events (${conversionMetricId})...`)
+    const conversionEvents = await klaviyoService.getAllEvents(conversionMetricId)
 
     // Run analysis
-    console.log(`[Analysis ${analysisId}] Running analysis...`)
+    console.log(`[Analysis ${analysisId}] Running analysis with ${startEvents.length} start events and ${conversionEvents.length} conversion events...`)
     const results = await analysisService.runAnalysis(
-      subscriptionEvents,
-      orderEvents
+      startEvents,
+      conversionEvents,
+      cohortPeriod
     )
 
     const executionTime = Date.now() - startTime
