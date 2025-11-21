@@ -100,10 +100,27 @@ export class KlaviyoService {
       pageCursor?: string | null
       filters?: any[]
       sort?: string
+      startDate?: string
+      endDate?: string
     } = {}
   ): Promise<KlaviyoListResponse<KlaviyoEvent>> {
-    let endpoint = `/events?fields[event]=timestamp,datetime,uuid`
-    endpoint += `&filter=equals(metric_id,"${metricId}")`
+    let endpoint = `/events?fields[event]=timestamp,datetime,uuid,event_properties`
+    
+    // Build filter string
+    let filters: string[] = [`equals(metric_id,"${metricId}")`]
+    
+    // Add date range filters if provided
+    if (options.startDate) {
+      filters.push(`greater-or-equal(datetime,${options.startDate}T00:00:00Z)`)
+    }
+    if (options.endDate) {
+      filters.push(`less-or-equal(datetime,${options.endDate}T23:59:59Z)`)
+    }
+    
+    // Combine filters with AND
+    if (filters.length > 0) {
+      endpoint += `&filter=and(${filters.join(',')})`
+    }
 
     if (options.sort) {
       endpoint += `&sort=${options.sort}`
@@ -126,6 +143,8 @@ export class KlaviyoService {
     metricId: string,
     options: {
       onProgress?: (page: number, total: number) => void
+      startDate?: string
+      endDate?: string
     } = {}
   ): Promise<KlaviyoEvent[]> {
     const allEvents: KlaviyoEvent[] = []
@@ -139,6 +158,8 @@ export class KlaviyoService {
       const response = await this.getEvents(metricId, {
         pageCursor,
         sort: 'datetime',
+        startDate: options.startDate,
+        endDate: options.endDate,
       })
 
       if (response.data) {
@@ -165,8 +186,8 @@ export class KlaviyoService {
   /**
    * Get all events for any metric (alias for getAllEventsWithPagination)
    */
-  async getAllEvents(metricId: string): Promise<KlaviyoEvent[]> {
-    return this.getAllEventsWithPagination(metricId)
+  async getAllEvents(metricId: string, startDate?: string, endDate?: string): Promise<KlaviyoEvent[]> {
+    return this.getAllEventsWithPagination(metricId, { startDate, endDate })
   }
 
   /**
