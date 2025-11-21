@@ -199,7 +199,7 @@ async function runAnalysisBackground(
       SET status = 'completed',
           results = ${JSON.stringify(results)}::jsonb,
           execution_time_ms = ${executionTime},
-          events_processed = ${subscriptionEvents.length + orderEvents.length},
+          events_processed = ${startEvents.length + conversionEvents.length},
           completed_at = NOW()
       WHERE id = ${analysisId}::uuid
     `
