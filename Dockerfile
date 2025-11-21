@@ -53,6 +53,9 @@ WORKDIR /app
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
+# Force IPv4 for DNS resolution (Alpine Linux + Node.js networking fix)
+ENV NODE_OPTIONS="--dns-result-order=ipv4first"
+
 # Install OpenSSL, CA certificates, and other required libraries for Prisma
 RUN apk add --no-cache libc6-compat openssl ca-certificates
 
