@@ -24,7 +24,35 @@ export default function NewAnalysisPage() {
     cohortPeriod: 'week' as 'day' | 'week' | 'month',
     startMetricId: '',
     conversionMetricId: '',
+    dateRangePreset: 'all' as 'all' | 'last30' | 'last90' | 'last180' | 'thisYear' | 'lastYear' | 'custom',
+    startDate: '',
+    endDate: '',
   })
+
+  // Calculate date ranges based on preset
+  const getDateRangeFromPreset = (preset: string) => {
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    
+    switch (preset) {
+      case 'last30':
+        const last30 = new Date(now.setDate(now.getDate() - 30))
+        return { start: last30.toISOString().split('T')[0], end: today }
+      case 'last90':
+        const last90 = new Date(now.setDate(now.getDate() - 90))
+        return { start: last90.toISOString().split('T')[0], end: today }
+      case 'last180':
+        const last180 = new Date(now.setDate(now.getDate() - 180))
+        return { start: last180.toISOString().split('T')[0], end: today }
+      case 'thisYear':
+        return { start: `${now.getFullYear()}-01-01`, end: today }
+      case 'lastYear':
+        return { start: `${now.getFullYear() - 1}-01-01`, end: `${now.getFullYear() - 1}-12-31` }
+      case 'all':
+      default:
+        return { start: '', end: '' }
+    }
+  }
 
   // Fetch metrics from Klaviyo
   const { data: metricsData, isLoading: metricsLoading, error: metricsError } = useQuery({
@@ -54,10 +82,23 @@ export default function NewAnalysisPage() {
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }))
+    const { name, value } = e.target
+    
+    // If date preset changes, update the date fields
+    if (name === 'dateRangePreset') {
+      const dateRange = getDateRangeFromPreset(value)
+      setFormData(prev => ({
+        ...prev,
+        dateRangePreset: value as any,
+        startDate: dateRange.start,
+        endDate: dateRange.end,
+      }))
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+      }))
+    }
   }
 
   return (
@@ -174,6 +215,60 @@ export default function NewAnalysisPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date Range
+                <span className="text-danger-500 ml-1">*</span>
+              </label>
+              <select
+                name="dateRangePreset"
+                value={formData.dateRangePreset}
+                onChange={handleChange}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                required
+              >
+                <option value="all">All Time</option>
+                <option value="last30">Last 30 Days</option>
+                <option value="last90">Last 90 Days</option>
+                <option value="last180">Last 180 Days</option>
+                <option value="thisYear">This Year</option>
+                <option value="lastYear">Last Year</option>
+                <option value="custom">Custom Range</option>
+              </select>
+              <p className="mt-1 text-sm text-gray-500">
+                Time period for events to analyze
+              </p>
+            </div>
+
+            {formData.dateRangePreset === 'custom' && (
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Start Date"
+                  name="startDate"
+                  type="date"
+                  value={formData.startDate}
+                  onChange={handleChange}
+                  required
+                />
+                <Input
+                  label="End Date"
+                  name="endDate"
+                  type="date"
+                  value={formData.endDate}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            )}
+
+            {formData.dateRangePreset !== 'all' && formData.dateRangePreset !== 'custom' && (
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-sm text-blue-800">
+                  <strong>Analyzing:</strong> {formData.startDate} to {formData.endDate}
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Cohort Period
                 <span className="text-danger-500 ml-1">*</span>
               </label>
@@ -189,7 +284,7 @@ export default function NewAnalysisPage() {
                 <option value="month">Monthly</option>
               </select>
               <p className="mt-1 text-sm text-gray-500">
-                How subscribers should be grouped for cohort analysis
+                How events should be grouped for cohort analysis
               </p>
             </div>
 

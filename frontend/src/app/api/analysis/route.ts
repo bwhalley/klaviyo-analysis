@@ -12,12 +12,9 @@ const analysisSchema = z.object({
   description: z.string().optional(),
   startMetricId: z.string().min(1, 'Start metric is required'),
   conversionMetricId: z.string().min(1, 'Conversion metric is required'),
-  dateRange: z
-    .object({
-      start: z.string(),
-      end: z.string(),
-    })
-    .optional(),
+  dateRangePreset: z.enum(['all', 'last30', 'last90', 'last180', 'thisYear', 'lastYear', 'custom']).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
   cohortPeriod: z.enum(['day', 'week', 'month']).optional(),
   filters: z
     .object({
@@ -71,7 +68,9 @@ export async function POST(request: NextRequest) {
       apiKey,
       validatedData.startMetricId,
       validatedData.conversionMetricId,
-      validatedData.cohortPeriod || 'week'
+      validatedData.cohortPeriod || 'week',
+      validatedData.startDate,
+      validatedData.endDate
     )
 
     return NextResponse.json({
@@ -161,7 +160,9 @@ async function runAnalysisBackground(
   apiKey: string,
   startMetricId: string,
   conversionMetricId: string,
-  cohortPeriod: 'day' | 'week' | 'month'
+  cohortPeriod: 'day' | 'week' | 'month',
+  startDate?: string,
+  endDate?: string
 ) {
   try {
     const startTime = Date.now()
@@ -177,11 +178,12 @@ async function runAnalysisBackground(
     const klaviyoService = new KlaviyoService(apiKey)
 
     // Fetch events for the selected metrics
-    console.log(`[Analysis ${analysisId}] Fetching start metric events (${startMetricId})...`)
-    const startEvents = await klaviyoService.getAllEvents(startMetricId)
+    const dateRangeMsg = startDate && endDate ? ` from ${startDate} to ${endDate}` : ' (all time)'
+    console.log(`[Analysis ${analysisId}] Fetching start metric events (${startMetricId})${dateRangeMsg}...`)
+    const startEvents = await klaviyoService.getAllEvents(startMetricId, startDate, endDate)
 
-    console.log(`[Analysis ${analysisId}] Fetching conversion metric events (${conversionMetricId})...`)
-    const conversionEvents = await klaviyoService.getAllEvents(conversionMetricId)
+    console.log(`[Analysis ${analysisId}] Fetching conversion metric events (${conversionMetricId})${dateRangeMsg}...`)
+    const conversionEvents = await klaviyoService.getAllEvents(conversionMetricId, startDate, endDate)
 
     // Run analysis
     console.log(`[Analysis ${analysisId}] Running analysis with ${startEvents.length} start events and ${conversionEvents.length} conversion events...`)
@@ -199,7 +201,7 @@ async function runAnalysisBackground(
       SET status = 'completed',
           results = ${JSON.stringify(results)}::jsonb,
           execution_time_ms = ${executionTime},
-          events_processed = ${subscriptionEvents.length + orderEvents.length},
+          events_processed = ${startEvents.length + conversionEvents.length},
           completed_at = NOW()
       WHERE id = ${analysisId}::uuid
     `
