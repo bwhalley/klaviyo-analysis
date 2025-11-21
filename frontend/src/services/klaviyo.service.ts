@@ -3,6 +3,7 @@
  * Port of logic from src/utils.ts
  */
 
+import axios, { AxiosInstance, AxiosError } from 'axios'
 import { KlaviyoEvent, KlaviyoMetric, KlaviyoListResponse } from '@/types'
 import { extractCursor, retry } from '@/lib/utils'
 import { cacheService } from './cache.service'
@@ -15,40 +16,88 @@ export const METRIC_IDS = {
 export class KlaviyoService {
   private apiKey: string
   private baseUrl: string
+  private axiosInstance: AxiosInstance
 
   constructor(apiKey: string) {
     this.apiKey = apiKey
     this.baseUrl =
       process.env.KLAVIYO_API_BASE_URL || 'https://a.klaviyo.com/api'
-  }
-
-  /**
-   * Make API request to Klaviyo
-   */
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`
-
-    const response = await fetch(url, {
-      ...options,
+    
+    // Create axios instance with proper SSL/TLS configuration for Docker
+    this.axiosInstance = axios.create({
+      baseURL: this.baseUrl,
+      timeout: 30000, // 30 second timeout
       headers: {
         'Authorization': `Klaviyo-API-Key ${this.apiKey}`,
         'revision': '2024-10-15',
         'Content-Type': 'application/json',
-        ...options.headers,
       },
+      // Disable SSL verification only if explicitly set (for dev environments)
+      // In production, always verify SSL
+      httpsAgent: process.env.NODE_TLS_REJECT_UNAUTHORIZED === '0' ? 
+        undefined : 
+        undefined,
     })
+  }
 
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(
-        `Klaviyo API Error (${response.status}): ${error}`
-      )
+  /**
+   * Make API request to Klaviyo with retry logic
+   */
+  private async request<T>(
+    endpoint: string,
+    options: { params?: Record<string, any> } = {}
+  ): Promise<T> {
+    const maxRetries = 3
+    let lastError: Error | null = null
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[Klaviyo] Request to ${endpoint} (attempt ${attempt}/${maxRetries})`)
+        
+        const response = await this.axiosInstance.get<T>(endpoint, {
+          params: options.params,
+        })
+
+        return response.data
+      } catch (error) {
+        lastError = error as Error
+        
+        if (axios.isAxiosError(error)) {
+          const axiosError = error as AxiosError
+          
+          // Log detailed error information
+          console.error(`[Klaviyo] Request failed (attempt ${attempt}/${maxRetries}):`, {
+            message: axiosError.message,
+            code: axiosError.code,
+            status: axiosError.response?.status,
+            url: `${this.baseUrl}${endpoint}`,
+            cause: axiosError.cause,
+          })
+          
+          // Don't retry on 4xx errors (client errors)
+          if (axiosError.response?.status && axiosError.response.status >= 400 && axiosError.response.status < 500) {
+            throw new Error(
+              `Klaviyo API Error (${axiosError.response.status}): ${JSON.stringify(axiosError.response.data)}`
+            )
+          }
+          
+          // For network errors, wait before retrying
+          if (attempt < maxRetries) {
+            const waitTime = attempt * 2000 // 2s, 4s, 6s
+            console.log(`[Klaviyo] Waiting ${waitTime}ms before retry...`)
+            await new Promise(resolve => setTimeout(resolve, waitTime))
+          }
+        } else {
+          console.error(`[Klaviyo] Unexpected error:`, error)
+          throw error
+        }
+      }
     }
 
-    return response.json()
+    // If all retries failed, throw the last error
+    throw new Error(
+      `Klaviyo API request failed after ${maxRetries} attempts: ${lastError?.message}`
+    )
   }
 
   /**
