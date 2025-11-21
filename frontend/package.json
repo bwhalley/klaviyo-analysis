@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "test": "echo \"Warning: No tests implemented yet. Running lint and type-check...\" && npm run lint && npm run type-check",
+    "test:ci": "npm run lint && npm run type-check",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
