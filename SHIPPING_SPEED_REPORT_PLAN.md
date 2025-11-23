@@ -17,25 +17,74 @@ Understand the impact of shipping speed/delivery time on time-to-repeat-purchase
 
 ### 1. **Placed Order Events** (`metric: "Placed Order"`)
 
-**Event Properties Needed:**
+**Metric ID:** `UhZHSf`
+
+**Event Properties Available:**
 ```javascript
 {
-  $event_id: string,           // Unique event identifier
-  $value: number,              // Order total
-  datetime: string,            // When order was placed
-  profile_id: string,          // Customer profile
+  // Core identifiers
+  $event_id: string,           // Order ID in Shopify (e.g., "6819569303869")
+  datetime: string,            // When order was placed (ISO 8601)
   
-  // Shipping-related properties (need to verify exact property names in Klaviyo)
-  shipping_method: string,     // e.g., "Standard", "Express", "Next Day"
-  shipping_rate: string,       // Shopify shipping rate title
-  shipping_price: number,      // Cost of shipping
+  // Order value
+  $value: number,              // Order total
+  $currency_code: string,      // "USD"
+  
+  // Shipping info (TOP LEVEL)
+  ShippingRate: string,        // ⭐ "Economy", "Express", etc. - THIS IS KEY!
   
   // Order details
-  order_id: string,           // To correlate with delivery events
-  item_count: number,
-  // ... other order properties
+  "Item Count": number,        // Number of items
+  Items: string[],             // Product names array
+  Collections: string[],       // Product collections
+  "Total Discounts": string,   // Discount amount
+  "Discount Codes": string[],  // Applied discount codes
+  "Source Name": string,       // "web", "pos", etc.
+  
+  // Extended data in $extra
+  $extra: {
+    order_number: number,      // Friendly order number (e.g., 1259)
+    name: string,              // "#1259"
+    id: number,                // Same as $event_id
+    created_at: string,        // ISO timestamp
+    updated_at: string,
+    
+    // Full shipping details
+    shipping_lines: [{
+      title: string,           // "Economy" - shipping rate name
+      code: string,            // "Economy"
+      price: string,           // "0.00"
+      discounted_price: string,
+      carrier_identifier: string | null,
+    }],
+    
+    // Customer info
+    customer: {
+      id: number,
+      email: string,
+      first_name: string,
+      last_name: string,
+    },
+    
+    // Line items (full product details)
+    line_items: [{
+      id: number,
+      product_id: number,
+      variant_id: number,
+      name: string,
+      quantity: number,
+      price: number,
+      sku: string,
+      // ... many more fields
+    }],
+    
+    // Addresses, tax, fulfillment, etc.
+  }
 }
 ```
+
+**Key Property for Analysis:** `ShippingRate` (top-level property)
+**Order Linking:** Use `$event_id` (the Shopify order ID)
 
 **Filters to Apply:**
 - Date range filter on `datetime`
@@ -48,20 +97,96 @@ Understand the impact of shipping speed/delivery time on time-to-repeat-purchase
 
 ---
 
-### 2. **Shipment Delivered Events** (`metric: "Shipment Delivered"` or similar)
+### 2. **Shipment Delivered Events** (`metric: "Wonderment - Shipment Delivered"`)
 
-**Event Properties Needed:**
+**Metric ID:** `RiMCL8`
+
+**Event Properties Available:**
 ```javascript
 {
-  datetime: string,            // When shipment was delivered
-  profile_id: string,          // Customer profile
-  order_id: string,            // To correlate with order
-  tracking_number: string,     // For reference
+  // Core identifiers
+  $event_id: string,                    // Unique event ID
+  datetime: string,                     // When event was recorded (ISO 8601)
+  
+  // Order linking ⭐ CRITICAL for matching
+  OrderID: string,                      // Shopify order ID (e.g., "6814596596029")
+  OrderNumber: string,                  // "#1256" format
+  
+  // Delivery timing (already calculated!)
+  EventDate: string,                    // "2025-11-20T12:48:00.000Z" - actual delivery time
+  DeliveredAt: string,                  // "11/20/2025 12:48" - human readable
+  OrderCreatedDate: string,             // "2025-11-17T16:42:21.000Z"
+  FulfillmentCreatedDate: string,       // "2025-11-17T17:02:41.000Z" - when shipped
+  BusinessDaysSinceFulfillmentCreated: number, // ⭐ Pre-calculated! (e.g., 3)
+  
+  // Shipping service info
+  ServiceLevelFriendlyName: string,     // ⭐ "Economy", "Express", etc. - matches ShippingRate
+  ServiceLevel: string,                 // "First Class Mail/Package" - detailed
+  ServiceLevelCode: string,             // "usps_first" - code
+  CarrierName: string,                  // "USPS", "FedEx", etc.
+  CarrierNameFriendly: string,          // "USPS"
+  
+  // Tracking
+  TrackingCode: string,                 // "9400150105800049021029"
+  TrackingURL: string,                  // USPS/carrier tracking URL
+  
+  // Status
+  CurrentStatus: string,                // "DELIVERED"
+  Substatus: string,                    // "delivered"
+  SubstatusMessage: string,             // "Delivered, Front Desk/Reception/Mail Room"
+  
+  // Order details
+  ProductNames: string[],               // ["Wonderment Cap"]
+  Skus: string[],                       // ["WNDR-LG-DAD-BK-OS"]
+  LineItemsCount: number,               // 1
+  TotalShipments: number,               // 1
+  TotalDiscounts: number,               // 25
+  
+  // Line items (detailed product info)
+  LineItems: [{
+    ProductID: string,
+    ProductName: string,
+    VariantID: string,
+    Sku: string,
+    Quantity: number,
+    Price: string,
+    ProductURL: string,
+    ProductImage: string,
+  }],
+  
+  // Addresses
+  ShippingAddress: {
+    FirstName: string,
+    LastName: string,
+    Address1: string,
+    Address2: string | null,
+    City: string,
+    State: string,
+    StateCode: string,
+    Zip: string,
+    CountryCode: string,
+  },
+  
+  // Additional metadata
+  EstimatedPackageDelivery: string | null,
+  EventLocation: {
+    City: string,
+    State: string,
+    Zip: string,
+    Country: string,
+  },
 }
 ```
 
+**Key Properties for Analysis:**
+- **Order Linking:** `OrderID` (matches `$event_id` from Placed Order)
+- **Delivery Date:** `EventDate` (ISO timestamp of delivery)
+- **Shipping Speed:** `ServiceLevelFriendlyName` (matches `ShippingRate` from order)
+- **Pre-calculated Duration:** `BusinessDaysSinceFulfillmentCreated` 🎉
+
 **What We Calculate:**
-- Delivery date - Order date = Delivery duration
+- Delivery date - Order date = Total delivery duration (calendar days)
+- Can also use `BusinessDaysSinceFulfillmentCreated` (business days from ship to delivery)
 - Quartiles of delivery duration by shipping method
 
 ---
@@ -158,8 +283,11 @@ function enrichOrderData(orderEvents, deliveryEvents, allOrdersByProfile) {
 ```
 
 ### Phase 3: Profile Aggregation
+
+**CRITICAL:** We must ensure we're only analyzing **truly NEW customers** - those whose LIFETIME first order occurred within the analysis window.
+
 ```typescript
-function buildProfileTimelines(enrichedOrders) {
+function buildProfileTimelines(enrichedOrders, allOrdersByProfile, startDate, endDate) {
   const profileMap = new Map()
   
   // Group orders by profile
@@ -173,39 +301,70 @@ function buildProfileTimelines(enrichedOrders) {
   // Build timeline for each profile
   const timelines = []
   for (const [profileId, orders] of profileMap) {
-    const sortedOrders = orders.sort((a, b) => 
+    // Get ALL orders for this profile (lifetime history)
+    const allProfileOrders = allOrdersByProfile[profileId] || []
+    
+    // Sort ALL orders chronologically
+    const sortedAllOrders = allProfileOrders.sort((a, b) => 
       new Date(a.datetime) - new Date(b.datetime)
     )
     
-    const firstOrder = sortedOrders[0]
-    const secondOrder = sortedOrders[1] || null
+    // The VERY FIRST order (lifetime) for this profile
+    const lifetimeFirstOrder = sortedAllOrders[0]
     
-    // Only include profiles who placed first order in analysis window
-    if (isInWindow(firstOrder.datetime, startDate, endDate)) {
-      timelines.push({
-        profile_id: profileId,
-        first_order: {
-          date: firstOrder.datetime,
-          order_id: firstOrder.order_id,
-          shipping_method: firstOrder.shipping_method,
-          shipping_rate: firstOrder.shipping_rate,
-          delivered_date: firstOrder.delivery_date,
-          delivery_duration_days: firstOrder.delivery_duration_days,
-        },
-        second_order: secondOrder ? {
-          date: secondOrder.datetime,
-          order_id: secondOrder.order_id,
-          days_since_first: daysBetween(firstOrder.datetime, secondOrder.datetime)
-        } : null,
-        cohort_period: getCohortPeriod(firstOrder.datetime, 'week'),
-        shipping_rate_group: normalizeShippingRate(firstOrder.shipping_rate),
-      })
+    // ⭐ CRITICAL FILTER: Only include if LIFETIME first order is in analysis window
+    if (!lifetimeFirstOrder || !isInWindow(lifetimeFirstOrder.datetime, startDate, endDate)) {
+      continue // Skip this profile - not a new customer in this period
     }
+    
+    // Now we know this is a NEW customer in the window
+    const secondOrder = sortedAllOrders[1] || null
+    
+    // Find delivery event for first order
+    const firstOrderEnriched = enrichedOrders.find(o => o.order_id === lifetimeFirstOrder.order_id)
+    
+    timelines.push({
+      profile_id: profileId,
+      email: lifetimeFirstOrder.customer?.email,
+      
+      // First order details
+      first_order: {
+        date: lifetimeFirstOrder.datetime,
+        order_id: lifetimeFirstOrder.order_id,
+        order_number: lifetimeFirstOrder.order_number,
+        shipping_rate: lifetimeFirstOrder.ShippingRate,
+        value: lifetimeFirstOrder.$value,
+        delivered_date: firstOrderEnriched?.delivery_date || null,
+        delivery_duration_days: firstOrderEnriched?.delivery_duration_days || null,
+      },
+      
+      // Second order (may be null if no repeat yet)
+      second_order: secondOrder ? {
+        date: secondOrder.datetime,
+        order_id: secondOrder.order_id,
+        order_number: secondOrder.order_number,
+        days_since_first: daysBetween(lifetimeFirstOrder.datetime, secondOrder.datetime),
+        value: secondOrder.$value,
+      } : null,
+      
+      // Cohort assignment
+      cohort_period: getCohortPeriod(lifetimeFirstOrder.datetime, 'week'),
+      shipping_rate_group: normalizeShippingRate(lifetimeFirstOrder.ShippingRate),
+      
+      // Metadata
+      total_lifetime_orders: sortedAllOrders.length,
+      is_repeat_customer: sortedAllOrders.length > 1,
+    })
   }
   
   return timelines
 }
 ```
+
+**Why This Matters:**
+- If a customer placed their first order in 2023, but ordered again in our 2025 analysis window, we DON'T want to include them
+- We only want customers whose LIFETIME first order is in the analysis period
+- This ensures we're measuring the impact of shipping speed on NEW customer retention
 
 ### Phase 4: Calculate Delivery Duration Quartiles
 ```typescript
@@ -710,24 +869,54 @@ The implementation is successful if:
 
 ---
 
-## ❓ Open Questions
+## ✅ CONFIRMED: Event Structure
 
-1. **Event Property Names**: What are the exact property names in Klaviyo for:
-   - Shipping method/rate?
-   - Order ID for linking?
-   - What is the exact metric name for delivery events?
+### Metric IDs (Verified)
+```typescript
+export const METRIC_IDS = {
+  PLACED_ORDER: 'UhZHSf',
+  SHIPMENT_DELIVERED: 'RiMCL8',
+} as const
+```
 
-2. **Date Range**: Should we analyze only first orders in window, or include all orders?
-   - Current plan: First orders in window only (cleaner cohorts)
+### Key Properties Confirmed
 
-3. **Statistical Significance**: Should we auto-hide cohorts with < N customers?
+**Placed Order:**
+- ✅ Shipping Rate: `ShippingRate` (top-level property)
+- ✅ Order ID for linking: `$event_id` (Shopify order ID)
+- ✅ Order timestamp: `datetime`
+- ✅ Customer email: `$extra.customer.email`
+
+**Wonderment Shipment Delivered:**
+- ✅ Order ID for linking: `OrderID` (matches `$event_id` from orders)
+- ✅ Delivery timestamp: `EventDate`
+- ✅ Shipping speed: `ServiceLevelFriendlyName` (matches `ShippingRate`)
+- ✅ Pre-calculated business days: `BusinessDaysSinceFulfillmentCreated`
+- ✅ Order created date: `OrderCreatedDate`
+
+**Key Insight:** Wonderment already calculates delivery time in business days! We can use this directly or calculate calendar days from order to delivery.
+
+---
+
+## ❓ Remaining Open Questions
+
+1. **Date Range Confirmed**: ✅ Analyze only LIFETIME first orders in window (confirmed by user)
+   - Fetch ALL order history per profile
+   - Filter to profiles whose very first order is in analysis window
+   - Track their repeat behavior
+
+2. **Statistical Significance**: Should we auto-hide cohorts with < N customers?
    - Recommendation: Yes, flag cells with < 30 customers
 
-4. **Caching**: Should we cache order histories or re-fetch each time?
+3. **Caching**: Should we cache order histories or re-fetch each time?
    - Start without caching, add if performance issues
 
-5. **Delivery Events**: Are delivery events always tracked? What % have them?
-   - Need to handle gracefully if missing
+4. **Delivery Events**: Are delivery events always tracked? What % have them?
+   - Need to handle gracefully if missing (show as "unknown" quartile)
+
+5. **Shipping Rate Normalization**: Should we normalize rates or use exact strings?
+   - Recommendation: Group similar rates (e.g., "Economy" === "Standard")
+   - Allow user to configure groupings
 
 ---
 
