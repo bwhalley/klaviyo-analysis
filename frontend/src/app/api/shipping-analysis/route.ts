@@ -10,8 +10,8 @@ import { z } from 'zod'
 const shippingAnalysisSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  startDate: z.string().min(1, 'Start date is required'),
+  endDate: z.string().min(1, 'End date is required'),
   dateRangePreset: z
     .enum(['last30', 'last90', 'last180', 'thisYear', 'lastYear', 'custom'])
     .optional(),
@@ -63,9 +63,9 @@ export async function POST(request: NextRequest) {
     runShippingAnalysisBackground(
       analysis.id,
       apiKey,
-      validatedData.cohortPeriod || 'week',
       validatedData.startDate,
-      validatedData.endDate
+      validatedData.endDate,
+      validatedData.cohortPeriod || 'week'
     )
 
     return NextResponse.json({
@@ -164,9 +164,9 @@ export async function GET(request: NextRequest) {
 async function runShippingAnalysisBackground(
   analysisId: string,
   apiKey: string,
-  cohortPeriod: 'day' | 'week' | 'month',
-  startDate?: string,
-  endDate?: string
+  startDate: string,
+  endDate: string,
+  cohortPeriod: 'day' | 'week' | 'month'
 ) {
   try {
     const startTime = Date.now()
@@ -183,9 +183,9 @@ async function runShippingAnalysisBackground(
     // Initialize Klaviyo service
     const klaviyoService = new KlaviyoService(apiKey)
 
-    // Parse dates
-    const start = startDate ? new Date(startDate) : new Date(0)
-    const end = endDate ? new Date(endDate) : new Date()
+    // Parse dates (validated as required in schema)
+    const start = new Date(startDate)
+    const end = new Date(endDate)
 
     console.log(
       `[Shipping Analysis ${analysisId}] Date range: ${start.toISOString()} to ${end.toISOString()}`
@@ -208,11 +208,9 @@ async function runShippingAnalysisBackground(
     console.log(
       `[Shipping Analysis ${analysisId}] Fetching delivery events...`
     )
-    const endDateExtended = endDate
-      ? new Date(new Date(endDate).getTime() + 30 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split('T')[0]
-      : undefined
+    const endDateExtended = new Date(end.getTime() + 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0]
     const deliveryEventsRaw = await klaviyoService.getDeliveryEvents(
       startDate,
       endDateExtended

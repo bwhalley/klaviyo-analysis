@@ -166,92 +166,11 @@ export default function AnalysisResultsPage() {
       {/* Results */}
       {analysis.status === 'completed' && analysis.results && (
         <>
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard
-              title="Total Subscribers"
-              value={formatNumber(analysis.results.statistics.totalSubscribers)}
-              icon={<Users className="h-8 w-8 text-primary-600" />}
-            />
-            <StatCard
-              title="Conversion Rate"
-              value={formatPercentage(analysis.results.statistics.conversionRate, 1)}
-              icon={<Target className="h-8 w-8 text-success-600" />}
-            />
-            <StatCard
-              title="Median Days to Order"
-              value={`${analysis.results.statistics.medianDaysToFirstOrder} days`}
-              icon={<Clock className="h-8 w-8 text-primary-600" />}
-            />
-            <StatCard
-              title="Subscribers with Order"
-              value={formatNumber(analysis.results.statistics.subscribersWithOrder)}
-              icon={<TrendingUp className="h-8 w-8 text-success-600" />}
-            />
-          </div>
-
-          {/* Detailed Statistics */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Detailed Statistics</CardTitle>
-              <CardDescription>Comprehensive analysis metrics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <StatItem
-                  label="Mean Days to Order"
-                  value={analysis.results.statistics.meanDaysToFirstOrder.toFixed(1)}
-                />
-                <StatItem
-                  label="Standard Deviation"
-                  value={analysis.results.statistics.stdDev.toFixed(1)}
-                />
-                <StatItem
-                  label="25th Percentile"
-                  value={`${analysis.results.statistics.percentiles.p25} days`}
-                />
-                <StatItem
-                  label="75th Percentile"
-                  value={`${analysis.results.statistics.percentiles.p75} days`}
-                />
-                <StatItem
-                  label="90th Percentile"
-                  value={`${analysis.results.statistics.percentiles.p90} days`}
-                />
-                <StatItem
-                  label="95th Percentile"
-                  value={`${analysis.results.statistics.percentiles.p95} days`}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Cohort Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Cohort Analysis</CardTitle>
-              <CardDescription>
-                Conversion rate and average days to order by signup cohort
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CohortChart data={analysis.results.cohortData} type="line" />
-            </CardContent>
-          </Card>
-
-          {/* Execution Info */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between text-sm text-gray-600">
-                <span>
-                  Processed {formatNumber(analysis.eventsProcessed || 0)} events
-                </span>
-                <span>
-                  Completed in {((analysis.executionTimeMs || 0) / 1000).toFixed(2)}s
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+          {analysis.params?.analysisType === 'shipping-speed-impact' ? (
+            <ShippingAnalysisResults analysis={analysis} />
+          ) : (
+            <CohortAnalysisResults analysis={analysis} />
+          )}
         </>
       )}
     </div>
@@ -280,6 +199,417 @@ function StatItem({ label, value }: { label: string; value: string }) {
       <p className="text-sm text-gray-600">{label}</p>
       <p className="text-lg font-semibold mt-1">{value}</p>
     </div>
+  )
+}
+
+function CohortAnalysisResults({ analysis }: { analysis: any }) {
+  return (
+    <>
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Total Subscribers"
+          value={formatNumber(analysis.results.statistics.totalSubscribers)}
+          icon={<Users className="h-8 w-8 text-primary-600" />}
+        />
+        <StatCard
+          title="Conversion Rate"
+          value={formatPercentage(analysis.results.statistics.conversionRate, 1)}
+          icon={<Target className="h-8 w-8 text-success-600" />}
+        />
+        <StatCard
+          title="Median Days to Order"
+          value={`${analysis.results.statistics.medianDaysToFirstOrder} days`}
+          icon={<Clock className="h-8 w-8 text-primary-600" />}
+        />
+        <StatCard
+          title="Subscribers with Order"
+          value={formatNumber(analysis.results.statistics.subscribersWithOrder)}
+          icon={<TrendingUp className="h-8 w-8 text-success-600" />}
+        />
+      </div>
+
+      {/* Detailed Statistics */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Detailed Statistics</CardTitle>
+          <CardDescription>Comprehensive analysis metrics</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <StatItem
+              label="Mean Days to Order"
+              value={analysis.results.statistics.meanDaysToFirstOrder.toFixed(1)}
+            />
+            <StatItem
+              label="Standard Deviation"
+              value={analysis.results.statistics.stdDev.toFixed(1)}
+            />
+            <StatItem
+              label="25th Percentile"
+              value={`${analysis.results.statistics.percentiles.p25} days`}
+            />
+            <StatItem
+              label="75th Percentile"
+              value={`${analysis.results.statistics.percentiles.p75} days`}
+            />
+            <StatItem
+              label="90th Percentile"
+              value={`${analysis.results.statistics.percentiles.p90} days`}
+            />
+            <StatItem
+              label="95th Percentile"
+              value={`${analysis.results.statistics.percentiles.p95} days`}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Cohort Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cohort Analysis</CardTitle>
+          <CardDescription>
+            Conversion rate and average days to order by signup cohort
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CohortChart data={analysis.results.cohortData} type="line" />
+        </CardContent>
+      </Card>
+
+      {/* Execution Info */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <span>
+              Processed {formatNumber(analysis.eventsProcessed || 0)} events
+            </span>
+            <span>
+              Completed in {((analysis.executionTimeMs || 0) / 1000).toFixed(2)}s
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  )
+}
+
+function ShippingAnalysisResults({ analysis }: { analysis: any }) {
+  const { summary, shippingRates, cohorts } = analysis.results || {}
+
+  if (!summary || !shippingRates || !cohorts) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-gray-600">Analysis results are incomplete or malformed.</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <>
+      {/* Summary Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="First-Time Customers"
+          value={formatNumber(summary.totalProfiles || 0)}
+          icon={<Users className="h-8 w-8 text-primary-600" />}
+        />
+        <StatCard
+          title="With Delivery Data"
+          value={formatNumber(summary.profilesWithDelivery || 0)}
+          icon={<TrendingUp className="h-8 w-8 text-success-600" />}
+        />
+        <StatCard
+          title="Repeat Purchasers"
+          value={formatNumber(summary.profilesWithRepeat || 0)}
+          icon={<Target className="h-8 w-8 text-success-600" />}
+        />
+        <StatCard
+          title="Overall Repeat Rate"
+          value={formatPercentage(summary.overallRepeatRate || 0, 1)}
+          icon={<Clock className="h-8 w-8 text-primary-600" />}
+        />
+      </div>
+
+      {/* Analysis Period Info */}
+      {summary.analysisWindow && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Analysis Period</p>
+                <p className="text-lg font-semibold mt-1">
+                  {summary.analysisWindow.startDate
+                    ? new Date(summary.analysisWindow.startDate).toLocaleDateString()
+                    : 'N/A'}{' '}
+                  -{' '}
+                  {summary.analysisWindow.endDate
+                    ? new Date(summary.analysisWindow.endDate).toLocaleDateString()
+                    : 'N/A'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Cohort Grouping</p>
+                <p className="text-lg font-semibold mt-1 capitalize">
+                  {summary.cohortPeriod || 'N/A'}ly
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Shipping Rates Overview */}
+      {shippingRates && shippingRates.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Shipping Rates Performance</CardTitle>
+            <CardDescription>
+              Delivery speed and repeat purchase rates by shipping method
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {shippingRates.map((rate: any) => (
+                <div
+                  key={rate.rate}
+                  className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-lg">{rate.rate || 'Unknown'}</h4>
+                    <span className="text-sm text-gray-600">
+                      {formatNumber(rate.count || 0)} orders
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <StatItem
+                      label="Avg Delivery Days"
+                      value={rate.avgDeliveryDays?.toFixed(1) || 'N/A'}
+                    />
+                    <StatItem
+                      label="Q1 (Fastest 25%)"
+                      value={rate.quartiles?.q1 ? `${rate.quartiles.q1} days` : 'N/A'}
+                    />
+                    <StatItem
+                      label="Median"
+                      value={rate.quartiles?.q2 ? `${rate.quartiles.q2} days` : 'N/A'}
+                    />
+                    <StatItem
+                      label="Q3 (Slowest 25%)"
+                      value={rate.quartiles?.q3 ? `${rate.quartiles.q3} days` : 'N/A'}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Cohort Data Table */}
+      {cohorts && cohorts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Cohort Performance Matrix</CardTitle>
+            <CardDescription>
+              Repeat purchase rates by cohort period, shipping rate, and delivery speed quartile
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2">Cohort</th>
+                    <th className="text-left p-2">Shipping Rate</th>
+                    <th className="text-left p-2">Delivery Speed</th>
+                    <th className="text-right p-2">Customers</th>
+                    <th className="text-right p-2">Avg Delivery</th>
+                    <th className="text-right p-2">30d Repeat %</th>
+                    <th className="text-right p-2">60d Repeat %</th>
+                    <th className="text-right p-2">90d Repeat %</th>
+                    <th className="text-right p-2">Median Days to Repeat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cohorts.map((cohort: any, idx: number) => (
+                    <tr
+                      key={idx}
+                      className="border-b hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="p-2">{cohort.cohortPeriod || 'N/A'}</td>
+                      <td className="p-2">{cohort.shippingRate || 'Unknown'}</td>
+                      <td className="p-2">
+                        <span
+                          className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                            cohort.deliveryQuartile === 'Q1 (Fastest)'
+                              ? 'bg-success-100 text-success-700'
+                              : cohort.deliveryQuartile === 'Q2'
+                              ? 'bg-blue-100 text-blue-700'
+                              : cohort.deliveryQuartile === 'Q3'
+                              ? 'bg-warning-100 text-warning-700'
+                              : cohort.deliveryQuartile === 'Q4 (Slowest)'
+                              ? 'bg-danger-100 text-danger-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          {cohort.deliveryQuartile || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="text-right p-2">
+                        {formatNumber(cohort.totalCustomers || 0)}
+                      </td>
+                      <td className="text-right p-2">
+                        {cohort.avgDeliveryDays ? `${cohort.avgDeliveryDays.toFixed(1)}d` : 'N/A'}
+                      </td>
+                      <td className="text-right p-2">
+                        {formatPercentage(cohort.repeatRate30d || 0, 1)}
+                      </td>
+                      <td className="text-right p-2">
+                        {formatPercentage(cohort.repeatRate60d || 0, 1)}
+                      </td>
+                      <td className="text-right p-2">
+                        {formatPercentage(cohort.repeatRate90d || 0, 1)}
+                      </td>
+                      <td className="text-right p-2">
+                        {cohort.medianDaysToRepeat || 'N/A'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Repeat Purchase Distribution */}
+      {cohorts && cohorts.filter((c: any) => c.customersWithRepeat > 0).length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Time to Repeat Purchase Distribution</CardTitle>
+            <CardDescription>
+              When do customers place their second order after delivery?
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {cohorts
+                .filter((c: any) => c.customersWithRepeat > 0)
+                .slice(0, 10)
+                .map((cohort: any, idx: number) => {
+                  const dist = cohort.repeatDistribution || {}
+                  const repeatCount = cohort.customersWithRepeat || 1
+                  
+                  return (
+                    <div key={idx}>
+                      <p className="text-sm font-medium mb-2">
+                        {cohort.cohortPeriod || 'N/A'} - {cohort.shippingRate || 'Unknown'} -{' '}
+                        {cohort.deliveryQuartile || 'N/A'}
+                      </p>
+                      <div className="grid grid-cols-6 gap-2 text-xs">
+                        <div className="text-center">
+                          <div
+                            className="bg-primary-100 rounded"
+                            style={{
+                              height: `${Math.max(
+                                5,
+                                ((dist.day_0_7 || 0) / repeatCount) * 100
+                              )}px`,
+                            }}
+                          />
+                          <p className="mt-1">0-7d</p>
+                          <p className="font-semibold">{dist.day_0_7 || 0}</p>
+                        </div>
+                        <div className="text-center">
+                          <div
+                            className="bg-primary-200 rounded"
+                            style={{
+                              height: `${Math.max(
+                                5,
+                                ((dist.day_8_14 || 0) / repeatCount) * 100
+                              )}px`,
+                            }}
+                          />
+                          <p className="mt-1">8-14d</p>
+                          <p className="font-semibold">{dist.day_8_14 || 0}</p>
+                        </div>
+                        <div className="text-center">
+                          <div
+                            className="bg-primary-300 rounded"
+                            style={{
+                              height: `${Math.max(
+                                5,
+                                ((dist.day_15_30 || 0) / repeatCount) * 100
+                              )}px`,
+                            }}
+                          />
+                          <p className="mt-1">15-30d</p>
+                          <p className="font-semibold">{dist.day_15_30 || 0}</p>
+                        </div>
+                        <div className="text-center">
+                          <div
+                            className="bg-primary-400 rounded"
+                            style={{
+                              height: `${Math.max(
+                                5,
+                                ((dist.day_31_60 || 0) / repeatCount) * 100
+                              )}px`,
+                            }}
+                          />
+                          <p className="mt-1">31-60d</p>
+                          <p className="font-semibold">{dist.day_31_60 || 0}</p>
+                        </div>
+                        <div className="text-center">
+                          <div
+                            className="bg-primary-500 rounded"
+                            style={{
+                              height: `${Math.max(
+                                5,
+                                ((dist.day_61_90 || 0) / repeatCount) * 100
+                              )}px`,
+                            }}
+                          />
+                          <p className="mt-1">61-90d</p>
+                          <p className="font-semibold">{dist.day_61_90 || 0}</p>
+                        </div>
+                        <div className="text-center">
+                          <div
+                            className="bg-primary-600 rounded"
+                            style={{
+                              height: `${Math.max(
+                                5,
+                                ((dist.day_91_plus || 0) / repeatCount) * 100
+                              )}px`,
+                            }}
+                          />
+                          <p className="mt-1">91+d</p>
+                          <p className="font-semibold">{dist.day_91_plus || 0}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Execution Info */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <span>Processed {formatNumber(analysis.eventsProcessed || 0)} events</span>
+            <span>
+              Completed in {((analysis.executionTimeMs || 0) / 1000).toFixed(2)}s
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </>
   )
 }
 
