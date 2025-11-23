@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
@@ -410,7 +411,7 @@ function ShippingAnalysisResults({ analysis }: { analysis: any }) {
       )}
 
       {/* Cohort Performance Matrix */}
-      {cohorts && cohorts.length > 0 && (
+      {cohorts && cohorts.length > 0 && shippingRates && shippingRates.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Weekly Cohort Performance</CardTitle>
@@ -419,7 +420,7 @@ function ShippingAnalysisResults({ analysis }: { analysis: any }) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <WeeklyCohortTable cohorts={cohorts} />
+            <WeeklyCohortTable cohorts={cohorts} shippingRates={shippingRates} />
           </CardContent>
         </Card>
       )}
@@ -551,9 +552,30 @@ function ShippingAnalysisResults({ analysis }: { analysis: any }) {
   )
 }
 
-function WeeklyCohortTable({ cohorts }: { cohorts: any[] }) {
+function WeeklyCohortTable({ 
+  cohorts, 
+  shippingRates 
+}: { 
+  cohorts: any[]
+  shippingRates: any[]
+}) {
+  // Extract unique shipping rates and set up state
+  const [selectedRate, setSelectedRate] = React.useState<string>('all')
+  
+  React.useEffect(() => {
+    // Set first rate as default on mount
+    if (shippingRates && shippingRates.length > 0 && selectedRate === 'all') {
+      setSelectedRate(shippingRates[0].rate)
+    }
+  }, [shippingRates, selectedRate])
+  
+  // Filter cohorts by selected shipping rate
+  const filteredCohorts = selectedRate === 'all' 
+    ? cohorts 
+    : cohorts.filter((c: any) => c.shippingRate === selectedRate)
+  
   // Aggregate cohorts by cohort period (week)
-  const aggregatedByWeek = cohorts.reduce((acc: any, cohort: any) => {
+  const aggregatedByWeek = filteredCohorts.reduce((acc: any, cohort: any) => {
     const week = cohort.cohortPeriod || 'Unknown'
     
     if (!acc[week]) {
@@ -638,8 +660,35 @@ function WeeklyCohortTable({ cohorts }: { cohorts: any[] }) {
   weeklyData.sort((a, b) => b.week.localeCompare(a.week))
   
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <div className="space-y-4">
+      {/* Shipping Rate Selector */}
+      <div className="flex items-center gap-3">
+        <label htmlFor="shipping-rate-select" className="text-sm font-medium text-gray-700">
+          Shipping Rate:
+        </label>
+        <select
+          id="shipping-rate-select"
+          value={selectedRate}
+          onChange={(e) => setSelectedRate(e.target.value)}
+          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        >
+          <option value="all">All Rates</option>
+          {shippingRates.map((rate: any) => (
+            <option key={rate.rate} value={rate.rate}>
+              {rate.rate} ({formatNumber(rate.count)} orders)
+            </option>
+          ))}
+        </select>
+        {selectedRate !== 'all' && (
+          <span className="text-sm text-gray-600">
+            Showing {formatNumber(filteredCohorts.reduce((sum: number, c: any) => sum + (c.totalCustomers || 0), 0))} customers
+          </span>
+        )}
+      </div>
+      
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
         <thead>
           <tr className="border-b">
             <th className="text-left p-2 font-semibold">Week</th>
@@ -686,6 +735,7 @@ function WeeklyCohortTable({ cohorts }: { cohorts: any[] }) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
