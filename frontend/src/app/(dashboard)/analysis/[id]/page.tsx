@@ -374,37 +374,42 @@ function ShippingAnalysisResults({ analysis }: { analysis: any }) {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {shippingRates.map((rate: any) => (
-                <div
-                  key={rate.rate}
-                  className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-lg">{rate.rate || 'Unknown'}</h4>
-                    <span className="text-sm text-gray-600">
-                      {formatNumber(rate.count || 0)} orders
-                    </span>
+              {shippingRates.map((rate: any) => {
+                const count = rate.count || rate.customerCount || 0
+                const quartiles = rate.quartiles || rate.quartileThresholds || {}
+                
+                return (
+                  <div
+                    key={rate.rate}
+                    className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-lg">{rate.rate || 'Unknown'}</h4>
+                      <span className="text-sm text-gray-600">
+                        {formatNumber(count)} orders
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <StatItem
+                        label="Avg Delivery Days"
+                        value={rate.avgDeliveryDays != null ? rate.avgDeliveryDays.toFixed(1) : 'N/A'}
+                      />
+                      <StatItem
+                        label="Q1 (Fastest 25%)"
+                        value={quartiles.q1 != null ? `${quartiles.q1} days` : 'N/A'}
+                      />
+                      <StatItem
+                        label="Median"
+                        value={quartiles.q2 != null ? `${quartiles.q2} days` : 'N/A'}
+                      />
+                      <StatItem
+                        label="Q3 (Slowest 25%)"
+                        value={quartiles.q3 != null ? `${quartiles.q3} days` : 'N/A'}
+                      />
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatItem
-                      label="Avg Delivery Days"
-                      value={rate.avgDeliveryDays?.toFixed(1) || 'N/A'}
-                    />
-                    <StatItem
-                      label="Q1 (Fastest 25%)"
-                      value={rate.quartiles?.q1 ? `${rate.quartiles.q1} days` : 'N/A'}
-                    />
-                    <StatItem
-                      label="Median"
-                      value={rate.quartiles?.q2 ? `${rate.quartiles.q2} days` : 'N/A'}
-                    />
-                    <StatItem
-                      label="Q3 (Slowest 25%)"
-                      value={rate.quartiles?.q3 ? `${rate.quartiles.q3} days` : 'N/A'}
-                    />
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </CardContent>
         </Card>
@@ -673,11 +678,14 @@ function WeeklyCohortTable({
           className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
         >
           <option value="all">All Rates</option>
-          {shippingRates.map((rate: any) => (
-            <option key={rate.rate} value={rate.rate}>
-              {rate.rate} ({formatNumber(rate.count)} orders)
-            </option>
-          ))}
+          {shippingRates.map((rate: any) => {
+            const count = rate.count || rate.customerCount || 0
+            return (
+              <option key={rate.rate} value={rate.rate}>
+                {rate.rate} ({formatNumber(count)} orders)
+              </option>
+            )
+          })}
         </select>
         {selectedRate !== 'all' && (
           <span className="text-sm text-gray-600">
