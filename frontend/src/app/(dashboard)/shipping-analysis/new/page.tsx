@@ -15,6 +15,20 @@ import {
 
 export default function NewShippingAnalysisPage() {
   const router = useRouter()
+  
+  // Calculate default date range
+  const getDefaultDates = () => {
+    const now = new Date()
+    const last90 = new Date(now)
+    last90.setDate(now.getDate() - 90)
+    return {
+      start: last90.toISOString().split('T')[0],
+      end: now.toISOString().split('T')[0],
+    }
+  }
+  
+  const defaultDates = getDefaultDates()
+  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -26,8 +40,8 @@ export default function NewShippingAnalysisPage() {
       | 'thisYear'
       | 'lastYear'
       | 'custom',
-    startDate: '',
-    endDate: '',
+    startDate: defaultDates.start,
+    endDate: defaultDates.end,
   })
 
   // Calculate date ranges based on preset

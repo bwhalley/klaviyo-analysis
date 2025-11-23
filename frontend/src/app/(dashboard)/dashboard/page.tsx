@@ -26,12 +26,15 @@ export default function DashboardPage() {
   // Calculate summary stats
   const totalAnalyses = analyses.length
   const completedAnalyses = analyses.filter((a: any) => a.status === 'completed').length
+  
+  // Calculate avg conversion rate (only for cohort analyses, not shipping analyses)
+  const cohortAnalyses = analyses.filter(
+    (a: any) => a.status === 'completed' && a.results && a.params?.analysisType !== 'shipping-speed-impact'
+  )
   const avgConversionRate =
-    completedAnalyses > 0
-      ? analyses
-          .filter((a: any) => a.status === 'completed' && a.results)
-          .reduce((sum: number, a: any) => sum + (a.results?.statistics?.conversionRate || 0), 0) /
-        completedAnalyses
+    cohortAnalyses.length > 0
+      ? cohortAnalyses.reduce((sum: number, a: any) => sum + (a.results?.statistics?.conversionRate || 0), 0) /
+        cohortAnalyses.length
       : 0
 
   return (
@@ -206,7 +209,9 @@ function AnalysisRow({ analysis }: { analysis: any }) {
           </span>
           {analysis.status === 'completed' && analysis.results && (
             <p className="text-sm text-gray-600 mt-1">
-              {formatNumber(analysis.results.statistics.totalSubscribers)} subscribers
+              {analysis.params?.analysisType === 'shipping-speed-impact'
+                ? `${formatNumber(analysis.results.summary?.totalProfiles || 0)} customers`
+                : `${formatNumber(analysis.results.statistics?.totalSubscribers || 0)} subscribers`}
             </p>
           )}
         </div>
