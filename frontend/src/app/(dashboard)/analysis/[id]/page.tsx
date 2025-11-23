@@ -409,79 +409,17 @@ function ShippingAnalysisResults({ analysis }: { analysis: any }) {
         </Card>
       )}
 
-      {/* Cohort Data Table */}
+      {/* Cohort Performance Matrix */}
       {cohorts && cohorts.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Cohort Performance Matrix</CardTitle>
+            <CardTitle>Weekly Cohort Performance</CardTitle>
             <CardDescription>
-              Repeat purchase rates by cohort period, shipping rate, and delivery speed quartile
+              Repeat purchase and delivery metrics aggregated by first order week
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2">Cohort</th>
-                    <th className="text-left p-2">Shipping Rate</th>
-                    <th className="text-left p-2">Delivery Speed</th>
-                    <th className="text-right p-2">Customers</th>
-                    <th className="text-right p-2">Avg Delivery</th>
-                    <th className="text-right p-2">30d Repeat %</th>
-                    <th className="text-right p-2">60d Repeat %</th>
-                    <th className="text-right p-2">90d Repeat %</th>
-                    <th className="text-right p-2">Median Days to Repeat</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cohorts.map((cohort: any, idx: number) => (
-                    <tr
-                      key={idx}
-                      className="border-b hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="p-2">{cohort.cohortPeriod || 'N/A'}</td>
-                      <td className="p-2">{cohort.shippingRate || 'Unknown'}</td>
-                      <td className="p-2">
-                        <span
-                          className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                            cohort.deliveryQuartile === 'Q1 (Fastest)'
-                              ? 'bg-success-100 text-success-700'
-                              : cohort.deliveryQuartile === 'Q2'
-                              ? 'bg-blue-100 text-blue-700'
-                              : cohort.deliveryQuartile === 'Q3'
-                              ? 'bg-warning-100 text-warning-700'
-                              : cohort.deliveryQuartile === 'Q4 (Slowest)'
-                              ? 'bg-danger-100 text-danger-700'
-                              : 'bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          {cohort.deliveryQuartile || 'N/A'}
-                        </span>
-                      </td>
-                      <td className="text-right p-2">
-                        {formatNumber(cohort.totalCustomers || 0)}
-                      </td>
-                      <td className="text-right p-2">
-                        {cohort.avgDeliveryDays ? `${cohort.avgDeliveryDays.toFixed(1)}d` : 'N/A'}
-                      </td>
-                      <td className="text-right p-2">
-                        {formatPercentage(cohort.repeatRate30d || 0, 1)}
-                      </td>
-                      <td className="text-right p-2">
-                        {formatPercentage(cohort.repeatRate60d || 0, 1)}
-                      </td>
-                      <td className="text-right p-2">
-                        {formatPercentage(cohort.repeatRate90d || 0, 1)}
-                      </td>
-                      <td className="text-right p-2">
-                        {cohort.medianDaysToRepeat || 'N/A'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <WeeklyCohortTable cohorts={cohorts} />
           </CardContent>
         </Card>
       )}
@@ -610,6 +548,145 @@ function ShippingAnalysisResults({ analysis }: { analysis: any }) {
         </CardContent>
       </Card>
     </>
+  )
+}
+
+function WeeklyCohortTable({ cohorts }: { cohorts: any[] }) {
+  // Aggregate cohorts by cohort period (week)
+  const aggregatedByWeek = cohorts.reduce((acc: any, cohort: any) => {
+    const week = cohort.cohortPeriod || 'Unknown'
+    
+    if (!acc[week]) {
+      acc[week] = {
+        week,
+        totalCustomers: 0,
+        customersWithRepeat: 0,
+        customersWithDelivery: 0,
+        deliveryDays: [],
+        daysToRepeat: [],
+        fastReorders: 0, // customers who repeated before delivery
+        repeat30d: 0,
+        repeat60d: 0,
+        repeat90d: 0,
+      }
+    }
+    
+    acc[week].totalCustomers += cohort.totalCustomers || 0
+    acc[week].customersWithRepeat += cohort.customersWithRepeat || 0
+    acc[week].customersWithDelivery += cohort.customersWithDelivery || 0
+    
+    // Collect delivery days for percentile calculation
+    if (cohort.avgDeliveryDays) {
+      // Use avg as proxy - ideally we'd have raw data
+      for (let i = 0; i < (cohort.customersWithDelivery || 0); i++) {
+        acc[week].deliveryDays.push(cohort.avgDeliveryDays)
+      }
+    }
+    
+    // Collect days to repeat for median calculation
+    if (cohort.medianDaysToRepeat) {
+      for (let i = 0; i < (cohort.customersWithRepeat || 0); i++) {
+        acc[week].daysToRepeat.push(cohort.medianDaysToRepeat)
+      }
+    }
+    
+    // Count fast reorders (0-7 days, likely before delivery)
+    if (cohort.repeatDistribution?.day_0_7) {
+      acc[week].fastReorders += cohort.repeatDistribution.day_0_7
+    }
+    
+    // Aggregate repeat counts
+    acc[week].repeat30d += (cohort.repeatRate30d || 0) * (cohort.totalCustomers || 0)
+    acc[week].repeat60d += (cohort.repeatRate60d || 0) * (cohort.totalCustomers || 0)
+    acc[week].repeat90d += (cohort.repeatRate90d || 0) * (cohort.totalCustomers || 0)
+    
+    return acc
+  }, {})
+  
+  // Calculate percentiles
+  const calculatePercentile = (arr: number[], percentile: number) => {
+    if (!arr.length) return null
+    const sorted = [...arr].sort((a, b) => a - b)
+    const index = Math.ceil((percentile / 100) * sorted.length) - 1
+    return sorted[Math.max(0, index)]
+  }
+  
+  const calculateMedian = (arr: number[]) => calculatePercentile(arr, 50)
+  
+  // Process aggregated data
+  const weeklyData = Object.values(aggregatedByWeek).map((week: any) => {
+    const p25 = calculatePercentile(week.deliveryDays, 25)
+    const p50 = calculatePercentile(week.deliveryDays, 50)
+    const p75 = calculatePercentile(week.deliveryDays, 75)
+    const medianDaysToRepeat = calculateMedian(week.daysToRepeat)
+    
+    return {
+      week: week.week,
+      totalCustomers: week.totalCustomers,
+      medianDaysToRepeat,
+      deliveryP25: p25,
+      deliveryP50: p50,
+      deliveryP75: p75,
+      fastReorderRate: week.totalCustomers > 0 ? week.fastReorders / week.totalCustomers : 0,
+      repeatRate30d: week.totalCustomers > 0 ? week.repeat30d / week.totalCustomers : 0,
+      repeatRate60d: week.totalCustomers > 0 ? week.repeat60d / week.totalCustomers : 0,
+      repeatRate90d: week.totalCustomers > 0 ? week.repeat90d / week.totalCustomers : 0,
+    }
+  })
+  
+  // Sort by week descending
+  weeklyData.sort((a, b) => b.week.localeCompare(a.week))
+  
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b">
+            <th className="text-left p-2 font-semibold">Week</th>
+            <th className="text-right p-2 font-semibold">Customers</th>
+            <th className="text-right p-2 font-semibold">Median Days to Repeat</th>
+            <th className="text-right p-2 font-semibold">Delivery P25</th>
+            <th className="text-right p-2 font-semibold">Delivery P50</th>
+            <th className="text-right p-2 font-semibold">Delivery P75</th>
+            <th className="text-right p-2 font-semibold">Fast Reorders</th>
+            <th className="text-right p-2 font-semibold">30d Repeat %</th>
+            <th className="text-right p-2 font-semibold">60d Repeat %</th>
+            <th className="text-right p-2 font-semibold">90d Repeat %</th>
+          </tr>
+        </thead>
+        <tbody>
+          {weeklyData.map((row, idx) => (
+            <tr
+              key={idx}
+              className="border-b hover:bg-gray-50 transition-colors"
+            >
+              <td className="p-2 font-medium">{row.week}</td>
+              <td className="text-right p-2">{formatNumber(row.totalCustomers)}</td>
+              <td className="text-right p-2">
+                {row.medianDaysToRepeat ? `${row.medianDaysToRepeat.toFixed(1)}d` : 'N/A'}
+              </td>
+              <td className="text-right p-2">
+                {row.deliveryP25 ? `${row.deliveryP25.toFixed(1)}d` : 'N/A'}
+              </td>
+              <td className="text-right p-2">
+                {row.deliveryP50 ? `${row.deliveryP50.toFixed(1)}d` : 'N/A'}
+              </td>
+              <td className="text-right p-2">
+                {row.deliveryP75 ? `${row.deliveryP75.toFixed(1)}d` : 'N/A'}
+              </td>
+              <td className="text-right p-2">
+                <span className="font-semibold text-primary-600">
+                  {formatPercentage(row.fastReorderRate, 1)}
+                </span>
+              </td>
+              <td className="text-right p-2">{formatPercentage(row.repeatRate30d, 1)}</td>
+              <td className="text-right p-2">{formatPercentage(row.repeatRate60d, 1)}</td>
+              <td className="text-right p-2">{formatPercentage(row.repeatRate90d, 1)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
