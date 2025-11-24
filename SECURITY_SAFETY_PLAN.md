@@ -1,599 +1,524 @@
-# Security, Safety & Data Handling Improvement Plan
+# Security & Safety Best Practices
 
 **Project:** Klaviyo Analysis Web Application  
-**Branch:** `refactor/code-improvements`  
-**Date:** November 20, 2024  
-**Status:** Review Phase - No Implementation Yet
+**Updated:** November 24, 2024  
+**Status:** Operational Guide
 
 ---
 
 ## Executive Summary
 
-This document outlines a comprehensive plan to improve the security, data handling, API safety, and overall effectiveness of the Klaviyo Analysis application. The plan is divided into 5 phases with 47 specific improvements prioritized by severity and impact.
+This document outlines security best practices and operational guidelines for the Klaviyo Analysis application. Follow these guidelines to maintain a secure deployment and protect your data.
 
-**Current Risk Level:** MEDIUM-HIGH
-- 🔴 Critical Issues: 6
-- 🟠 High Priority: 14
-- 🟡 Medium Priority: 18
-- 🟢 Low Priority: 9
-
----
-
-## Critical Issues Identified
-
-### 🔴 CRITICAL (Fix Immediately)
-
-1. **Hardcoded Secrets in Version Control**
-   - Location: `docker-compose.yml`
-   - Risk: Production credentials exposed if committed
-   - Impact: Complete system compromise
-
-2. **No Rate Limiting**
-   - Location: All API routes
-   - Risk: Brute force attacks, API abuse, DoS
-   - Impact: Service degradation, unauthorized access
-
-3. **No Account Lockout Mechanism**
-   - Location: `auth.ts`
-   - Risk: Unlimited password attempts
-   - Impact: Brute force password cracking
-
-4. **Background Jobs Run In-Process**
-   - Location: `api/analysis/route.ts`
-   - Risk: Server crashes, memory leaks, no scalability
-   - Impact: Analysis failures, service interruption
-
-5. **Large Unbounded Data Storage**
-   - Location: `Analysis.results` field
-   - Risk: Database bloat, performance degradation
-   - Impact: Service slowdown, storage costs
-
-6. **No Audit Logging**
-   - Location: Entire application
-   - Risk: Can't track security events, compliance violations
-   - Impact: Unable to detect or investigate breaches
+**Security Model:**
+- 🔒 Local-first processing (data never leaves your control)
+- 🔐 Encrypted API key storage (AES-256)
+- 👤 User authentication with NextAuth.js
+- 📊 Row-level security in PostgreSQL
+- 🛡️ Audit logging for sensitive operations
 
 ---
 
-## Phase 1: Security Hardening (Week 1)
+## Pre-Deployment Security Checklist
 
-**Priority:** Critical  
-**Estimated Time:** 3-5 days  
-**Risk Reduction:** 70%
+Before deploying to production, ensure you've completed these critical security steps:
 
-### 1.1 Authentication & Authorization
+### 🔐 Secrets Management
 
-- [ ] **Implement rate limiting** (express-rate-limit or similar)
-  - Login: 5 attempts per 15 minutes per IP
-  - API routes: 100 requests per 15 minutes per user
-  - Signup: 3 attempts per hour per IP
-
-- [ ] **Add account lockout mechanism**
-  - Lock after 5 failed attempts
-  - 30-minute cooldown period
-  - Email notification on lockout
-  - Admin unlock capability
-
-- [ ] **Enhance password requirements**
-  ```typescript
-  - Minimum 12 characters (up from 8)
-  - At least 1 uppercase letter
-  - At least 1 lowercase letter
-  - At least 1 number
-  - At least 1 special character
-  - Check against common passwords list
-  - Check for leaked passwords (haveibeenpwned API)
+- [ ] **Generate Secure Secrets**
+  ```bash
+  # Generate NEXTAUTH_SECRET (32+ characters)
+  openssl rand -base64 32
+  
+  # Generate ENCRYPTION_KEY for API keys
+  openssl rand -hex 32
   ```
 
-- [ ] **Implement JWT refresh tokens**
-  - Short-lived access tokens (15 minutes)
-  - Longer-lived refresh tokens (7 days)
-  - Rotate on use
-  - Store refresh token hash in database
+- [ ] **Configure Environment Variables**
+  - Copy `env.example` to `.env`
+  - Fill in all required values
+  - Never commit `.env` to version control
+  - Use Docker secrets in production
 
-- [ ] **Add CSRF protection**
-  - Double-submit cookie pattern
-  - Or use NextAuth built-in CSRF
+- [ ] **Change Default Passwords**
+  - PostgreSQL: Update `POSTGRES_PASSWORD`
+  - PgAdmin: Change default admin credentials
+  - Application: Ensure strong user passwords
 
-### 1.2 API Security
+### 🛡️ Authentication & Authorization
 
-- [ ] **Add security headers** (helmet.js)
-  ```typescript
-  - Content-Security-Policy
-  - X-Frame-Options: DENY
-  - X-Content-Type-Options: nosniff
-  - Strict-Transport-Security
-  - Referrer-Policy: no-referrer
-  ```
+- [ ] **Password Requirements**
+  - Minimum 8 characters (12+ recommended)
+  - Mix of letters, numbers, and symbols
+  - Consider using a password manager
 
-- [ ] **Configure CORS properly**
-  - Whitelist specific origins
-  - Limit allowed methods
-  - Set credentials policy
+- [ ] **API Key Security**
+  - Klaviyo API keys are encrypted at rest
+  - Never log or expose API keys
+  - Rotate keys regularly
 
-- [ ] **Implement request size limits**
-  - Body parser: 1MB limit
-  - JSON payload: 500KB limit
-  - Analysis params: 100KB limit
+- [ ] **Session Management**
+  - Sessions expire automatically
+  - Logout clears all session data
+  - Secure httpOnly cookies used
 
-- [ ] **Add request timeouts**
-  - API routes: 30 seconds
-  - Analysis creation: 5 seconds
-  - Klaviyo API calls: 60 seconds
+### 🌐 Network Security
 
-### 1.3 Secrets Management
+- [ ] **SSL/TLS Configuration**
+  - Enable HTTPS in production
+  - Use Let's Encrypt for free SSL certificates
+  - Configure in `nginx/nginx.conf`
 
-- [ ] **Remove hardcoded secrets from docker-compose.yml**
-  - Use `.env` files (not committed)
-  - Document in `.env.example`
-  - Add to `.gitignore`
+- [ ] **Firewall Rules**
+  - Only expose ports 80 and 443
+  - Block direct database access (port 5432)
+  - Restrict access to PgAdmin in production
 
-- [ ] **Implement proper key rotation**
-  - Add `ENCRYPTION_KEY_ROTATION` support
-  - Add `API_KEY_VERSION` field
-  - Graceful migration path
-
-- [ ] **Use environment-specific configurations**
-  - Separate dev/staging/prod configs
-  - Use Docker secrets for production
-  - Validate required env vars on startup
+- [ ] **CORS Configuration**
+  - Configure allowed origins
+  - Limit to your domain(s) only
+  - Set appropriate headers
 
 ---
 
-## Phase 2: Data Protection & Privacy (Week 2-3)
+## Operational Security Guidelines
 
-**Priority:** High  
-**Estimated Time:** 7-9 days (includes OAuth migration)  
-**Risk Reduction:** 20%
+### Data Privacy & Protection
 
-### 2.1 Data Sanitization & Validation
+**Local-First Architecture:**
+- All analysis processing happens within your Docker container
+- Klaviyo data is fetched and processed locally
+- No external analytics or tracking
+- Results stored only in your database
 
-- [ ] **Sanitize all inputs** (DOMPurify or similar)
-  - Remove HTML tags from text inputs
-  - Escape SQL special characters
-  - Validate UUIDs format
-  - Sanitize file names
+**API Key Encryption:**
+- Klaviyo API keys encrypted with AES-256
+- Encryption key stored in environment variables
+- Keys never logged or exposed in responses
+- Rotate encryption keys periodically
 
-- [ ] **Validate data on retrieval**
-  - Add Zod schemas for database models
-  - Validate before using in operations
-  - Handle corrupted data gracefully
+**Database Security:**
+- Row-level security ensures users only see their data
+- PostgreSQL runs in isolated Docker container
+- Regular backups recommended
+- Soft-delete for user accounts (30-day retention)
 
-- [ ] **Implement PII protection**
-  ```typescript
-  - Mask email addresses in logs: u***@example.com
-  - Redact API keys in logs: pk_***
-  - Hash IP addresses for analytics
-  - Remove PII from error messages
-  ```
+### User Account Security
 
-### 2.2 Data Retention & Cleanup
+**Password Best Practices:**
+- Use unique passwords for each account
+- Enable password managers for your team
+- Change default admin credentials immediately
+- Implement password rotation policies
 
-- [ ] **Implement configurable data retention policies**
-  - Add user settings for retention preferences
-  - Default policies:
-    - Failed analyses: Delete after 7 days
-    - Completed analyses: Keep for 90 days
-    - Archived analyses: Keep for 1 year
-    - User accounts: Soft delete for 30 days
-  - User-configurable options:
-    - Analysis retention: 30/60/90/180/365 days
-    - Failed analysis retention: 1/7/14/30 days
-    - Auto-archive threshold: 30/60/90 days
-  - UI in settings page for managing retention
-  - Override per-analysis retention settings
+**Multi-User Setup:**
+- Create individual accounts for each team member
+- Don't share Klaviyo API keys between accounts
+- Review user access regularly
+- Disable accounts when team members leave
 
-- [ ] **Create data cleanup jobs**
-  ```typescript
-  - Daily: Clean up failed/expired analyses (respects user settings)
-  - Weekly: Archive old completed analyses (respects user settings)
-  - Monthly: Purge soft-deleted users
-  - Respect user retention preferences in all cleanup operations
-  ```
+**Session Security:**
+- Sessions are secured with httpOnly cookies
+- Automatic logout after inactivity
+- Clear sessions on password change
+- Monitor active sessions
 
-- [ ] **Add result size limits**
-  - Max 10MB per analysis result
-  - Paginate large profile lists
-  - Compress stored data
-  - Warn users of large datasets
+### API & External Access
 
-### 2.3 Klaviyo OAuth Migration
+**Klaviyo API Security:**
+- Use private API keys only (never public keys)
+- Restrict API key permissions in Klaviyo dashboard
+- Monitor API usage for anomalies
+- Rotate keys if compromised
 
-- [ ] **Migrate from API key to OAuth 2.0**
-  - Benefits:
-    - More secure (token-based, revocable)
-    - Better user experience (no copy-paste keys)
-    - Automatic token refresh
-    - Granular scope control
-    - Audit trail of access
-  - Implementation steps:
-    - Register OAuth app with Klaviyo
-    - Implement OAuth flow (Authorization Code)
-    - Store access/refresh tokens (encrypted)
-    - Implement token refresh logic
-    - Add migration path for existing API key users
-    - UI for OAuth connection/disconnection
-    - Fallback to API key for compatibility
-  - Update KlaviyoService to support both methods
-  - Add token expiration handling
-  - Document OAuth setup for users
+**Rate Limiting:**
+- Authentication endpoints are rate-limited
+- Protects against brute force attacks
+- Analysis creation has reasonable limits
+- Contact support if hitting legitimate limits
 
-### 2.4 Database Security
-
-- [ ] **Review all raw SQL queries**
-  - Ensure parameterization
-  - Add SQL injection tests
-  - Consider ORM for complex queries
-
-- [ ] **Add database encryption at rest**
-  - Encrypt sensitive columns
-  - Use PostgreSQL pgcrypto extension
-  - Rotate encryption keys
-
-- [ ] **Implement row-level security**
-  - Users can only access their own data
-  - Add RLS policies in PostgreSQL
-  - Test authorization boundaries
+**Request Timeouts:**
+- Analysis requests timeout after reasonable periods
+- Prevents resource exhaustion
+- Failed analyses are automatically cleaned up
+- Retry failed analyses if needed
 
 ---
 
-## Phase 3: Audit Logging & Monitoring (Week 3)
+## Data Management
 
-**Priority:** High  
-**Estimated Time:** 3-4 days  
-**Risk Reduction:** 5%
+### Data Retention
 
-### 3.1 Audit Logging
+**Default Retention Policies:**
+- Completed analyses: Kept indefinitely (user can delete)
+- Failed analyses: Automatically cleaned up after 7 days
+- User accounts: Soft-deleted for 30 days before permanent removal
+- Audit logs: Retained for 90 days
 
-- [ ] **Create comprehensive audit log system**
-  ```typescript
-  Events to log:
-  - User signup/login/logout
-  - Password changes
-  - API key creation/rotation
-  - Analysis creation/completion/failure
-  - Settings changes
-  - Failed authentication attempts
-  - Rate limit violations
-  ```
+**Managing Your Data:**
+- Export analyses as CSV or JSON before deletion
+- Regularly clean up old analyses to save disk space
+- Use the dashboard to review and delete unneeded data
+- Contact support for bulk deletion needs
 
-- [ ] **Implement log levels and categories**
-  ```typescript
-  - SECURITY: Auth, access, permissions
-  - DATA: CRUD operations, exports
-  - SYSTEM: Errors, performance, health
-  - AUDIT: All user actions
-  ```
+### Data Backup
 
-- [ ] **Structure logs properly**
-  ```typescript
-  {
-    timestamp: ISO8601,
-    level: "info" | "warn" | "error",
-    category: "security" | "data" | "system" | "audit",
-    userId: string,
-    action: string,
-    resource: string,
-    ip: string (hashed),
-    userAgent: string,
-    result: "success" | "failure",
-    metadata: object
-  }
-  ```
+**Recommended Backup Strategy:**
 
-### 3.2 Monitoring & Alerts
+```bash
+# Daily automated backups
+docker-compose exec db pg_dump -U klaviyo_user klaviyo_analysis > backup-$(date +%Y%m%d).sql
 
-- [ ] **Add health check endpoints**
-  - `/api/health/live` - basic liveness
-  - `/api/health/ready` - readiness with dependencies
-  - `/api/health/metrics` - performance metrics
+# Restore from backup
+docker-compose exec -T db psql -U klaviyo_user klaviyo_analysis < backup-20241124.sql
+```
 
-- [ ] **Implement error tracking**
-  - Integrate Sentry or similar
-  - Alert on critical errors
-  - Track error patterns
+**What to Back Up:**
+- PostgreSQL database (includes all analyses and user data)
+- `.env` file (securely, separate from database)
+- Custom configurations
 
-- [ ] **Create monitoring dashboard**
-  - Active users
-  - Analysis success/failure rates
-  - API response times
-  - Database connection pool status
-  - Redis cache hit rates
+**Backup Best Practices:**
+- Automate daily backups
+- Store backups off-site or in cloud storage
+- Encrypt backup files
+- Test restoration regularly
+- Keep at least 30 days of backups
+
+### Database Security
+
+**Row-Level Security (RLS):**
+- Automatically enabled on user data
+- Users cannot access other users' analyses
+- Admin operations require elevated permissions
+- Enforced at the database level
+
+**SQL Injection Protection:**
+- All queries use parameterization
+- Input validation with Zod schemas
+- No raw SQL in user inputs
+- Prisma ORM provides additional protection
+
+**Connection Security:**
+- Database accessible only within Docker network
+- No external exposure by default
+- Strong passwords required
+- Connection pooling prevents exhaustion
 
 ---
 
-## Phase 4: API Safety & Resilience (Week 4)
+## Monitoring & Audit Logging
 
-**Priority:** Medium  
-**Estimated Time:** 5-7 days  
-**Risk Reduction:** 4%
+### Audit Log System
 
-### 4.1 External API Protection
+**Events Logged:**
+- User signup, login, logout
+- Password changes
+- API key creation and updates
+- Analysis creation and completion
+- Failed authentication attempts
+- Settings changes
 
-- [ ] **Implement circuit breaker for Klaviyo API**
-  ```typescript
-  - Fail fast after 5 consecutive errors
-  - Half-open after 30 seconds
-  - Reset after 3 successful calls
-  ```
+**Viewing Audit Logs:**
 
-- [ ] **Add retry strategy with backoff**
-  ```typescript
-  - Max 3 retries
-  - Exponential backoff: 1s, 2s, 4s
-  - Different strategies per error type
-  ```
+```bash
+# View recent audit logs
+docker-compose exec db psql -U klaviyo_user klaviyo_analysis \
+  -c "SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 20;"
 
-- [ ] **Implement API key rotation for Klaviyo**
-  - Support multiple keys
-  - Graceful failover
-  - Automated rotation schedule
+# Filter by user
+docker-compose exec db psql -U klaviyo_user klaviyo_analysis \
+  -c "SELECT * FROM audit_logs WHERE user_id = 'USER_ID_HERE';"
+```
 
-### 4.2 Background Job Processing
+**Log Retention:**
+- Audit logs retained for 90 days
+- Critical security events flagged
+- IP addresses hashed for privacy
+- No sensitive data in logs
 
-- [ ] **Move to proper job queue** (BullMQ recommended)
-  ```typescript
-  Benefits:
-  - Job persistence
-  - Retry logic
-  - Progress tracking
-  - Failure handling
-  - Horizontal scaling
-  ```
+### Health Monitoring
 
-- [ ] **Add job monitoring**
-  - Job status tracking
-  - Progress updates (0-100%)
-  - Estimated completion time
-  - Real-time notifications
+**Health Check Endpoints:**
 
-- [ ] **Implement job priorities**
-  - HIGH: User-initiated analyses
-  - NORMAL: Scheduled analyses
-  - LOW: Cleanup jobs
+```bash
+# Basic liveness check
+curl http://localhost:3000/api/health
 
-### 4.3 API Versioning
+# Should return: {"status":"ok"}
+```
 
-- [ ] **Add API versioning**
-  ```typescript
-  /api/v1/analysis
-  /api/v2/analysis
-  ```
+**Container Health:**
 
-- [ ] **Document breaking changes**
-  - Changelog
-  - Migration guides
-  - Deprecation notices
+```bash
+# Check all services
+docker-compose ps
 
----
+# View logs for specific service
+docker-compose logs -f web
+docker-compose logs -f db
 
-## Phase 5: Performance & Effectiveness (Week 5)
+# Monitor resource usage
+docker stats
+```
 
-**Priority:** Medium  
-**Estimated Time:** 4-6 days  
-**Risk Reduction:** 1%
+**Database Monitoring:**
 
-### 5.1 Database Optimization
+```bash
+# Connect to database
+docker-compose exec db psql -U klaviyo_user klaviyo_analysis
 
-- [ ] **Add missing indexes**
-  ```sql
-  - analyses(user_id, status, created_at)
-  - analyses(status) WHERE status IN ('running', 'pending')
-  - users(email) [already exists]
-  - users(last_login_at) for analytics
-  ```
+# Check database size
+SELECT pg_size_pretty(pg_database_size('klaviyo_analysis'));
 
-- [ ] **Configure connection pooling**
-  ```typescript
-  {
-    max: 20,          // max connections
-    min: 5,           // min connections
-    idle: 10000,      // idle timeout
-    acquire: 60000,   // acquire timeout
-  }
-  ```
-
-- [ ] **Implement query optimization**
-  - Use `select` to limit fields
-  - Use `include` properly
-  - Avoid N+1 queries
-  - Add query explain plans
-
-### 5.2 Caching Strategy
-
-- [ ] **Implement intelligent caching**
-  ```typescript
-  Cache:
-  - Klaviyo metrics: 1 hour
-  - Analysis results: 24 hours
-  - User profiles: 15 minutes
-  - Lists/segments: 30 minutes
-  ```
-
-- [ ] **Add cache invalidation**
-  - On data updates
-  - Manual purge capability
-  - TTL-based expiration
-  - LRU eviction policy
-
-- [ ] **Cache warming**
-  - Pre-fetch common data
-  - Background refresh
-  - Graceful degradation
-
-### 5.3 Code Quality
-
-- [ ] **Add comprehensive error handling**
-  ```typescript
-  - Custom error classes
-  - Error boundaries (React)
-  - Consistent error responses
-  - User-friendly messages
-  ```
-
-- [ ] **Implement input validation middleware**
-  - Centralized validation
-  - Reusable schemas
-  - Clear error messages
-
-- [ ] **Add TypeScript strict mode**
-  - No implicit any
-  - Strict null checks
-  - Strict function types
+# Check table sizes
+SELECT schemaname, tablename, 
+       pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename))
+FROM pg_tables WHERE schemaname = 'public'
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+```
 
 ---
 
-## Implementation Guidelines
+## Incident Response
 
-### Testing Strategy
+### Common Security Scenarios
 
-For each phase:
-1. **Unit tests** for new functions
-2. **Integration tests** for API endpoints
-3. **Security tests** for vulnerabilities
-4. **Load tests** for performance
-5. **Manual testing** for UX
+**Scenario: Suspected Unauthorized Access**
 
-### Rollout Plan
-
-1. **Development Environment**
-   - Implement and test thoroughly
-   - Code review required
-   - Security review required
-
-2. **Staging Environment**
-   - Deploy and soak test
-   - Monitor for issues
-   - Gather metrics
-
-3. **Production Deployment**
-   - Deploy during low-traffic window
-   - Monitor closely for 24 hours
-   - Have rollback plan ready
-
-### Success Metrics
-
-- **Security:**
-  - Zero successful brute force attempts
-  - 100% audit log coverage
-  - < 0.1% authentication failures (from valid users)
-
-- **Performance:**
-  - API response time < 200ms (p95)
-  - Analysis processing time < 30s per 10k events
-  - 99.9% uptime
-
-- **Data Quality:**
-  - Zero data corruption incidents
-  - 100% data validation coverage
-  - Successful automated cleanup runs
-
----
-
-## Immediate Actions (Do First)
-
-### Critical Security Patches (Today)
-
-1. **Create `.env.example` and remove secrets from docker-compose.yml**
+1. **Immediate Actions:**
    ```bash
-   # Create .env file
-   cp docker-compose.yml .env.example
-   # Extract secrets to .env
-   # Update docker-compose.yml to use env_file
+   # Check audit logs for suspicious activity
+   docker-compose exec db psql -U klaviyo_user klaviyo_analysis \
+     -c "SELECT * FROM audit_logs WHERE action LIKE '%failed%' ORDER BY created_at DESC LIMIT 50;"
+   
+   # Review recent logins
+   docker-compose exec db psql -U klaviyo_user klaviyo_analysis \
+     -c "SELECT * FROM audit_logs WHERE action = 'login' ORDER BY created_at DESC LIMIT 20;"
    ```
 
-2. **Add rate limiting to login endpoint**
-   ```bash
-   npm install express-rate-limit
-   # Add middleware to auth routes
-   ```
+2. **Investigation:**
+   - Check for multiple failed login attempts
+   - Look for unusual IP addresses
+   - Review analysis creation patterns
+   - Check for API key changes
 
-3. **Implement account lockout**
-   ```sql
-   ALTER TABLE users ADD COLUMN failed_login_attempts INT DEFAULT 0;
-   ALTER TABLE users ADD COLUMN locked_until TIMESTAMP;
-   ```
+3. **Response:**
+   - Reset affected user passwords
+   - Rotate Klaviyo API keys if compromised
+   - Review and update access controls
+   - Document incident in audit log
 
-### High Priority (This Week)
+**Scenario: API Key Compromise**
 
-4. **Add audit logging table**
-   ```sql
-   CREATE TABLE audit_logs (
-     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-     user_id UUID REFERENCES users(id),
-     action VARCHAR(255) NOT NULL,
-     resource VARCHAR(255),
-     metadata JSONB,
-     ip_address VARCHAR(45),
-     created_at TIMESTAMP DEFAULT NOW()
-   );
-   ```
+1. **Immediate Actions:**
+   - Revoke compromised key in Klaviyo dashboard
+   - Generate new API key
+   - Update in application settings
+   - Review recent API usage in Klaviyo
 
-5. **Move background jobs to queue**
-   ```bash
-   npm install bullmq
-   # Create job processor
-   # Update analysis route
-   ```
+2. **Investigation:**
+   - Check audit logs for unusual exports
+   - Review analysis history
+   - Identify scope of data access
+   - Determine how key was compromised
 
-6. **Add security headers**
-   ```bash
-   npm install helmet
-   # Configure in Next.js config
-   ```
+3. **Prevention:**
+   - Educate users on key security
+   - Implement key rotation schedule
+   - Review access logs regularly
+   - Consider additional authentication layers
+
+**Scenario: Database Breach Attempt**
+
+1. **Detection Signs:**
+   - Unusual database queries in logs
+   - High CPU or memory usage
+   - Connection attempts from unknown sources
+   - Failed authentication to database
+
+2. **Response:**
+   - Immediately change database passwords
+   - Review firewall rules
+   - Check for SQL injection attempts in logs
+   - Restore from known-good backup if needed
+
+3. **Recovery:**
+   - Audit all user accounts
+   - Review and update security policies
+   - Implement additional monitoring
+   - Document lessons learned
 
 ---
 
-## Risk Assessment After Implementation
+## Performance & Optimization
 
-| Phase | Current Risk | After Implementation | Reduction |
-|-------|-------------|----------------------|-----------|
-| Phase 1 | HIGH | LOW | 70% |
-| Phase 2 | MEDIUM | LOW | 20% |
-| Phase 3 | MEDIUM | LOW | 5% |
-| Phase 4 | MEDIUM | LOW | 4% |
-| Phase 5 | LOW | LOW | 1% |
-| **Total** | **MEDIUM-HIGH** | **LOW** | **~100%** |
+### Database Performance
+
+**Current Optimizations:**
+- Indexed columns for fast queries
+- Connection pooling configured
+- Query optimization with Prisma ORM
+- Efficient data retrieval patterns
+
+**Monitoring Performance:**
+
+```bash
+# Check slow queries
+docker-compose exec db psql -U klaviyo_user klaviyo_analysis \
+  -c "SELECT query, calls, total_time, mean_time 
+      FROM pg_stat_statements 
+      ORDER BY mean_time DESC LIMIT 10;"
+
+# Monitor active connections
+docker-compose exec db psql -U klaviyo_user klaviyo_analysis \
+  -c "SELECT count(*) FROM pg_stat_activity;"
+```
+
+**Optimization Tips:**
+- Regularly vacuum and analyze tables
+- Review and clean up old analyses
+- Monitor disk space usage
+- Consider upgrading resources for large datasets
+
+### Analysis Performance
+
+**Best Practices:**
+- Limit date ranges to necessary periods
+- Use appropriate cohort groupings
+- Export large results for offline analysis
+- Monitor analysis completion times
+
+**Large Dataset Handling:**
+- Analyses process in the background
+- Progress tracked in real-time
+- Failed analyses automatically retry
+- Results paginated for large cohorts
+
+### Troubleshooting Slow Performance
+
+**Symptoms:**
+- Slow page loads
+- Analysis timeouts
+- Database connection errors
+- High memory usage
+
+**Solutions:**
+
+```bash
+# Check Docker resource limits
+docker stats
+
+# Increase memory allocation in docker-compose.yml
+services:
+  web:
+    mem_limit: 2g
+  db:
+    mem_limit: 1g
+
+# Clear old data
+docker-compose exec db psql -U klaviyo_user klaviyo_analysis \
+  -c "DELETE FROM analyses WHERE status = 'failed' AND created_at < NOW() - INTERVAL '7 days';"
+
+# Restart services
+docker-compose restart
+```
 
 ---
 
-## Budget & Resources
+## Security Best Practices Summary
 
-### Time Estimate
-- **Total Development:** 4-5 weeks
-- **Testing & QA:** 1 week
-- **Documentation:** 3 days
-- **Total:** 5-6 weeks
+### Daily Operations
 
-### Dependencies
-- BullMQ license (if using Pro): ~$500/month
-- Sentry (error tracking): ~$26/month
-- Additional testing tools: ~$100/month
+- **Regular Updates**: Keep Docker images and dependencies up to date
+- **Backup Verification**: Test backup restoration monthly
+- **Log Review**: Check audit logs weekly for anomalies
+- **Resource Monitoring**: Monitor disk space and memory usage
+- **Access Review**: Audit user accounts and permissions quarterly
+
+### Security Checklist for Production
+
+- [ ] All secrets in `.env` (not hardcoded)
+- [ ] Strong passwords for all accounts
+- [ ] SSL/TLS enabled
+- [ ] Firewall configured properly
+- [ ] Backups automated and tested
+- [ ] Audit logging enabled
+- [ ] Resource limits configured
+- [ ] Updates scheduled regularly
+
+### Compliance Considerations
+
+**Data Privacy:**
+- User data never leaves your infrastructure
+- API keys encrypted at rest
+- Minimal data retention by default
+- Right to delete (user can remove all their data)
+- Audit trail for data access
+
+**GDPR Considerations (if applicable):**
+- Users control their own data
+- Data export available (CSV/JSON)
+- Account deletion permanently removes data after 30 days
+- Audit logs track all data access
+- No third-party data sharing
+
+### Security Update Policy
+
+**Monitoring for Updates:**
+- Subscribe to security advisories for all dependencies
+- Regular npm audit runs
+- Docker image security scanning
+- Monitor Klaviyo API changes
+
+**Update Procedure:**
+
+```bash
+# Check for updates
+cd frontend
+npm audit
+
+# Update dependencies
+npm update
+
+# Rebuild containers
+cd ..
+docker-compose down
+docker-compose up --build -d
+
+# Verify everything works
+docker-compose logs -f web
+```
 
 ---
 
-## Questions for Review
+## Getting Help
 
-1. **Priorities:** Do you agree with the phase prioritization?
-2. **Timeline:** Is 5-6 weeks acceptable, or should we fast-track certain phases?
-3. **Dependencies:** Are you comfortable with the proposed external services?
-4. **Budget:** Is the estimated cost acceptable?
-5. **Scope:** Are there any additional concerns not covered here?
+### Support Resources
+
+- **Documentation**: See [README.md](./README.md) for full documentation
+- **Quick Start**: [QUICK_START.md](./QUICK_START.md) for setup help
+- **Deployment**: [DEPLOYMENT_PLAN.md](./DEPLOYMENT_PLAN.md) for architecture details
+
+### Reporting Security Issues
+
+If you discover a security vulnerability:
+
+1. **Do not** open a public GitHub issue
+2. Email security concerns directly to project maintainers
+3. Include detailed information about the vulnerability
+4. Allow time for patches before public disclosure
+
+### Community Support
+
+- Open GitHub issues for bugs and feature requests
+- Check existing documentation first
+- Provide detailed error messages and logs
+- Include system information and Docker versions
 
 ---
 
-## Next Steps
-
-**After approval:**
-1. Create detailed tickets for Phase 1
-2. Set up project board in GitHub
-3. Schedule security review meeting
-4. Begin implementation on `refactor/code-improvements` branch
-5. Daily standups to track progress
-
----
-
-*Document maintained by: AI Assistant*  
-*Last updated: November 20, 2024*  
-*Version: 1.0*
+*Document maintained by: Project Team*  
+*Last updated: November 24, 2024*  
+*Version: 2.0 - Operational Guide*
 
