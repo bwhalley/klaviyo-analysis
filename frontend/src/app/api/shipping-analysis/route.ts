@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/encryption'
-import { KlaviyoService, METRIC_IDS } from '@/services/klaviyo.service'
+import { KlaviyoService } from '@/services/klaviyo.service'
 import { shippingAnalysisService } from '@/services/shipping-analysis.service'
 import { z } from 'zod'
 
@@ -183,6 +183,17 @@ async function runShippingAnalysisBackground(
     // Initialize Klaviyo service
     const klaviyoService = new KlaviyoService(apiKey)
 
+    // Look up required metric IDs by name
+    console.log(`[Shipping Analysis ${analysisId}] Looking up metric IDs...`)
+    const metricIds = await klaviyoService.getRequiredMetricIds([
+      'Placed Order',
+      'Wonderment - Shipment Delivered'
+    ])
+    const PLACED_ORDER_ID = metricIds['Placed Order']
+    const SHIPMENT_DELIVERED_ID = metricIds['Wonderment - Shipment Delivered']
+    console.log(`[Shipping Analysis ${analysisId}] Using Placed Order ID: ${PLACED_ORDER_ID}`)
+    console.log(`[Shipping Analysis ${analysisId}] Using Shipment Delivered ID: ${SHIPMENT_DELIVERED_ID}`)
+
     // Parse dates (validated as required in schema)
     const start = new Date(startDate)
     const end = new Date(endDate)
@@ -194,7 +205,7 @@ async function runShippingAnalysisBackground(
     // Step 1: Fetch orders in the analysis window
     console.log(`[Shipping Analysis ${analysisId}] Fetching orders in window...`)
     const orderEventsRaw = await klaviyoService.getAllEvents(
-      METRIC_IDS.PLACED_ORDER,
+      PLACED_ORDER_ID,
       startDate,
       endDate
     )
@@ -212,6 +223,7 @@ async function runShippingAnalysisBackground(
       .toISOString()
       .split('T')[0]
     const deliveryEventsRaw = await klaviyoService.getDeliveryEvents(
+      SHIPMENT_DELIVERED_ID,
       startDate,
       endDateExtended
     )
@@ -235,7 +247,7 @@ async function runShippingAnalysisBackground(
     // Fetch all orders for each profile (lifetime, no date filter)
     const allOrdersByProfile = new Map<string, any[]>()
     const allOrdersRaw = await klaviyoService.getAllEvents(
-      METRIC_IDS.PLACED_ORDER
+      PLACED_ORDER_ID
     )
     const allOrders = shippingAnalysisService.parseOrderEvents(allOrdersRaw)
 

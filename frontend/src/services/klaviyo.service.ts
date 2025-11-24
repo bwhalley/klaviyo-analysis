@@ -141,6 +141,39 @@ export class KlaviyoService {
     )
   }
 
+  async getMetricIdByName(name: string): Promise<string | null> {
+    const metric = await this.getMetricByName(name)
+    return metric?.id || null
+  }
+
+  async getRequiredMetricIds(metricNames: string[]): Promise<Record<string, string>> {
+    console.log(`[Klaviyo] Looking up metric IDs for: ${metricNames.join(', ')}`)
+    const metrics = await this.getMetrics()
+    const result: Record<string, string> = {}
+    const missing: string[] = []
+
+    for (const name of metricNames) {
+      const metric = metrics.data.find(
+        (m) => m.attributes.name.toLowerCase() === name.toLowerCase()
+      )
+      if (metric) {
+        result[name] = metric.id
+        console.log(`[Klaviyo] Found metric "${name}": ${metric.id}`)
+      } else {
+        missing.push(name)
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Required metrics not found in Klaviyo account: ${missing.join(', ')}. ` +
+        `Please ensure these metrics exist in your Klaviyo account.`
+      )
+    }
+
+    return result
+  }
+
   /**
    * Get events for a specific metric
    */
@@ -284,9 +317,12 @@ export class KlaviyoService {
    * Get all orders for a specific profile (lifetime history)
    * Used for determining if an order is a customer's first, second, etc.
    */
-  async getProfileOrderHistory(profileId: string): Promise<KlaviyoEvent[]> {
+  async getProfileOrderHistory(
+    metricId: string,
+    profileId: string
+  ): Promise<KlaviyoEvent[]> {
     console.log(`Fetching complete order history for profile ${profileId}...`)
-    return this.getAllEventsWithPagination(METRIC_IDS.PLACED_ORDER, {
+    return this.getAllEventsWithPagination(metricId, {
       customFilter: `equals(profile_id,"${profileId}")`,
     })
   }
@@ -296,6 +332,7 @@ export class KlaviyoService {
    * Returns a map of profileId -> orders array
    */
   async getOrderHistoriesForProfiles(
+    metricId: string,
     profileIds: string[]
   ): Promise<Map<string, KlaviyoEvent[]>> {
     console.log(`Fetching order histories for ${profileIds.length} profiles...`)
@@ -304,7 +341,7 @@ export class KlaviyoService {
     // Fetch all orders for all profiles (no date filter)
     // We'll filter client-side by profile ID
     const allOrders = await this.getAllEventsWithPagination(
-      METRIC_IDS.PLACED_ORDER,
+      metricId,
       {}
     )
 
@@ -332,11 +369,12 @@ export class KlaviyoService {
    * Get delivery events for orders
    */
   async getDeliveryEvents(
+    metricId: string,
     startDate?: string,
     endDate?: string
   ): Promise<KlaviyoEvent[]> {
     console.log('Fetching delivery events...')
-    return this.getAllEventsWithPagination(METRIC_IDS.SHIPMENT_DELIVERED, {
+    return this.getAllEventsWithPagination(metricId, {
       startDate,
       endDate,
     })
