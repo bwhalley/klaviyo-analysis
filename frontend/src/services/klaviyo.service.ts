@@ -11,6 +11,7 @@ import { cacheService } from './cache.service'
 export const METRIC_IDS = {
   SUBSCRIBED_TO_LIST: 'UfyMVA',
   PLACED_ORDER: 'UhZHSf',
+  SHIPMENT_DELIVERED: 'RiMCL8',
 } as const
 
 export class KlaviyoService {
@@ -138,6 +139,39 @@ export class KlaviyoService {
         (m) => m.attributes.name.toLowerCase() === name.toLowerCase()
       ) || null
     )
+  }
+
+  async getMetricIdByName(name: string): Promise<string | null> {
+    const metric = await this.getMetricByName(name)
+    return metric?.id || null
+  }
+
+  async getRequiredMetricIds(metricNames: string[]): Promise<Record<string, string>> {
+    console.log(`[Klaviyo] Looking up metric IDs for: ${metricNames.join(', ')}`)
+    const metrics = await this.getMetrics()
+    const result: Record<string, string> = {}
+    const missing: string[] = []
+
+    for (const name of metricNames) {
+      const metric = metrics.data.find(
+        (m) => m.attributes.name.toLowerCase() === name.toLowerCase()
+      )
+      if (metric) {
+        result[name] = metric.id
+        console.log(`[Klaviyo] Found metric "${name}": ${metric.id}`)
+      } else {
+        missing.push(name)
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Required metrics not found in Klaviyo account: ${missing.join(', ')}. ` +
+        `Please ensure these metrics exist in your Klaviyo account.`
+      )
+    }
+
+    return result
   }
 
   /**
@@ -277,6 +311,73 @@ export class KlaviyoService {
   async getSegments(): Promise<any[]> {
     const response = await this.request<any>('/segments?fields[segment]=name')
     return response.data || []
+  }
+
+  /**
+   * Get all orders for a specific profile (lifetime history)
+   * Used for determining if an order is a customer's first, second, etc.
+   */
+  async getProfileOrderHistory(
+    metricId: string,
+    profileId: string
+  ): Promise<KlaviyoEvent[]> {
+    console.log(`Fetching complete order history for profile ${profileId}...`)
+    return this.getAllEventsWithPagination(metricId, {
+      customFilter: `equals(profile_id,"${profileId}")`,
+    })
+  }
+
+  /**
+   * Get all orders for multiple profiles
+   * Returns a map of profileId -> orders array
+   */
+  async getOrderHistoriesForProfiles(
+    metricId: string,
+    profileIds: string[]
+  ): Promise<Map<string, KlaviyoEvent[]>> {
+    console.log(`Fetching order histories for ${profileIds.length} profiles...`)
+    const ordersByProfile = new Map<string, KlaviyoEvent[]>()
+
+    // Fetch all orders for all profiles (no date filter)
+    // We'll filter client-side by profile ID
+    const allOrders = await this.getAllEventsWithPagination(
+      metricId,
+      {}
+    )
+
+    console.log(`Fetched ${allOrders.length} total orders`)
+
+    // Group by profile
+    for (const order of allOrders) {
+      // Extract profile ID from event
+      // The profile relationship is in the event data
+      const profileId = (order as any).relationships?.profile?.data?.id
+
+      if (profileId && profileIds.includes(profileId)) {
+        if (!ordersByProfile.has(profileId)) {
+          ordersByProfile.set(profileId, [])
+        }
+        ordersByProfile.get(profileId)!.push(order)
+      }
+    }
+
+    console.log(`Grouped into ${ordersByProfile.size} profiles`)
+    return ordersByProfile
+  }
+
+  /**
+   * Get delivery events for orders
+   */
+  async getDeliveryEvents(
+    metricId: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<KlaviyoEvent[]> {
+    console.log('Fetching delivery events...')
+    return this.getAllEventsWithPagination(metricId, {
+      startDate,
+      endDate,
+    })
   }
 }
 
