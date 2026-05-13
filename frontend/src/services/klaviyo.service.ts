@@ -30,7 +30,7 @@ export class KlaviyoService {
       timeout: 30000, // 30 second timeout
       headers: {
         'Authorization': `Klaviyo-API-Key ${this.apiKey}`,
-        'revision': '2024-10-15',
+        'revision': '2026-04-15',
         'Content-Type': 'application/json',
       },
       // Disable SSL verification only if explicitly set (for dev environments)

@@ -29,7 +29,7 @@ function klaviyoRequest(endpoint) {
       method: 'GET',
       headers: {
         'Authorization': `Klaviyo-API-Key ${KLAVIYO_API_KEY}`,
-        'revision': '2024-10-15',
+        'revision': '2026-04-15',
         'Accept': 'application/json'
       }
     };

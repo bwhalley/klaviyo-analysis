@@ -354,7 +354,7 @@ export class KlaviyoService {
       const response = await fetch(`${this.baseUrl}/metrics`, {
         headers: {
           'Authorization': `Klaviyo-API-Key ${this.apiKey}`,
-          'revision': '2024-10-15'
+          'revision': '2026-04-15'
         }
       })
       return response.json()
